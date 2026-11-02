@@ -11,7 +11,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class ApiClient(
-    private var baseUrl: String = "http://10.0.2.2:5000"
+    private var baseUrl: String = "https://sweety-ai-three.vercel.app"
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
