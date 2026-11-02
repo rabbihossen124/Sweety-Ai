@@ -1,0 +1,15 @@
+# Security: NEVER commit .env to GitHub
+.env
+.env.local
+.env.*.local
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+

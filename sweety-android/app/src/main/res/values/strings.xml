@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Sweety AI</string>
+    <string name="accessibility_service_description">Enables Sweety AI to safely lock the phone screen when requested by voice.</string>
+</resources>
+

@@ -1,0 +1,19 @@
+{
+  "name": "sweety-backend",
+  "version": "1.0.0",
+  "description": "Secure Express Backend for Sweety AI Android Assistant powered by Gemini API",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.29.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5"
+  }
+}
+
