@@ -114,13 +114,13 @@ app.get("/", (req, res) => {
     <body>
       <div class="card">
         <h1>✨ Sweety AI Official</h1>
-        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.0.4)</p>
+        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.0.5)</p>
         
-        <a class="btn-primary" href="/download">📲 ১ ক্লিকে ইনস্টল (সরাসরি APK)</a>
+        <a class="btn-primary" href="/download">📲 ১ ক্লিকে ইনস্টল (সরাসরি APK v1.0.5)</a>
         <a class="btn-secondary" href="/release">⭐ অফিসিয়াল রিলিজ APK</a>
 
         <div class="tip">
-          💡 ডাউনলোড করার পর ফাইলে ক্লিক করলেই ফোনে ইনস্টল শুরু হয়ে যাবে।
+          💡 <b>ইনস্টল গাইড:</b> ডাউনলোড শেষে নোটিফিকেশন বা ফাইল ম্যানেজারে APK ওপেন করে "Install" বা "Install anyway" চাপলেই ইনস্টল সম্পন্ন হবে।
         </div>
         
         <div class="badge">🚀 Backend Status: Active & Connected</div>

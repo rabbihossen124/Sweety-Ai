@@ -1,22 +1,27 @@
 package com.sweety.ai.voice
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import java.net.URLEncoder
 import java.util.Locale
 
 class MultilingualTextToSpeech(
-    context: Context,
+    private val context: Context,
+    private val getBaseUrl: () -> String = { "https://sweety-ai-three.vercel.app" },
     private val onInitComplete: (Boolean) -> Unit = {}
 ) {
     private var tts: TextToSpeech? = null
-    private var isInitialized = false
+    private var isTtsInitialized = false
+    private var mediaPlayer: MediaPlayer? = null
     private var onSpeechDoneCallback: (() -> Unit)? = null
 
-    // Cute voice customization parameters
-    var voicePitch: Float = 1.25f // Sweet, cute, youthful female pitch
-    var voiceSpeed: Float = 1.04f // Lively, conversational pace
+    // Sweet female pitch tuning for local fallback
+    var voicePitch: Float = 1.25f
+    var voiceSpeed: Float = 1.04f
 
     private val banglaLocale = Locale("bn", "BD")
     private val banglaIndiaLocale = Locale("bn", "IN")
@@ -24,82 +29,128 @@ class MultilingualTextToSpeech(
     private val englishLocale = Locale.US
 
     init {
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                isInitialized = true
-                tts?.setSpeechRate(voiceSpeed)
-                tts?.setPitch(voicePitch)
-                setupUtteranceListener()
-                applyFemaleVoice(banglaLocale)
-                Log.d(TAG, "TTS initialized with Cute Female Voice profile")
-                onInitComplete(true)
-            } else {
-                Log.e(TAG, "Failed to initialize TTS with code: $status")
-                onInitComplete(false)
+        try {
+            tts = TextToSpeech(context) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    isTtsInitialized = true
+                    tts?.setSpeechRate(voiceSpeed)
+                    tts?.setPitch(voicePitch)
+                    setupUtteranceListener()
+                    applyFemaleVoice(banglaLocale)
+                    Log.d(TAG, "Local TTS initialized as fallback")
+                    onInitComplete(true)
+                } else {
+                    onInitComplete(false)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing local TTS: ${e.message}")
         }
     }
 
     private fun setupUtteranceListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {
-                Log.d(TAG, "Speech started: $utteranceId")
-            }
-
+            override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) {
-                Log.d(TAG, "Speech completed: $utteranceId")
                 onSpeechDoneCallback?.invoke()
             }
-
             override fun onError(utteranceId: String?) {
-                Log.e(TAG, "Speech error on: $utteranceId")
                 onSpeechDoneCallback?.invoke()
             }
         })
     }
 
     /**
-     * Speaks the provided text in a sweet, cute female tone
+     * Speaks the text using Google's Neural Cloud Voice (Chat Experience),
+     * falling back to local TTS seamlessly if offline.
      */
     fun speak(text: String, onDone: (() -> Unit)? = null) {
-        if (!isInitialized || text.isBlank()) {
+        if (text.isBlank()) {
             onDone?.invoke()
             return
         }
 
+        stop()
         this.onSpeechDoneCallback = onDone
 
-        // 1. Determine target language
+        // 1. Attempt Google Neural Cloud Voice streaming (Super realistic, natural human voice)
+        try {
+            val lang = when {
+                containsBangla(text) -> "bn"
+                containsHindi(text) -> "hi"
+                else -> "en"
+            }
+
+            val cleanText = text.replace(Regex("[*#_`~]"), "").trim()
+            val encodedText = URLEncoder.encode(cleanText, "UTF-8")
+            val base = getBaseUrl().trimEnd('/')
+            val streamUrl = "$base/api/assistant/tts?text=$encodedText&lang=$lang"
+
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .build()
+                )
+                setDataSource(streamUrl)
+                setOnPreparedListener { mp ->
+                    try {
+                        mp.start()
+                    } catch (e: Exception) {
+                        speakLocalFallback(text, onDone)
+                    }
+                }
+                setOnCompletionListener {
+                    onSpeechDoneCallback?.invoke()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.w(TAG, "Cloud TTS stream error ($what, $extra), switching to local TTS fallback")
+                    speakLocalFallback(text, onDone)
+                    true
+                }
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Cloud TTS stream setup error: ${e.message}")
+            speakLocalFallback(text, onDone)
+        }
+    }
+
+    private fun speakLocalFallback(text: String, onDone: (() -> Unit)?) {
+        if (!isTtsInitialized || tts == null) {
+            onDone?.invoke()
+            return
+        }
+
         val targetLocale = when {
             containsBangla(text) -> banglaLocale
             containsHindi(text) -> hindiLocale
             else -> englishLocale
         }
 
-        val result = tts?.setLanguage(targetLocale)
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            // Fallback for Bengali
-            if (targetLocale == banglaLocale) {
-                tts?.setLanguage(banglaIndiaLocale)
-            } else {
-                tts?.language = Locale.getDefault()
+        try {
+            val result = tts?.setLanguage(targetLocale)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                if (targetLocale == banglaLocale) {
+                    tts?.setLanguage(banglaIndiaLocale)
+                } else {
+                    tts?.language = Locale.getDefault()
+                }
             }
+
+            tts?.setPitch(voicePitch)
+            tts?.setSpeechRate(voiceSpeed)
+            applyFemaleVoice(targetLocale)
+
+            val utteranceId = "sweety_${System.currentTimeMillis()}"
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Local TTS fallback failed: ${e.message}")
+            onDone?.invoke()
         }
-
-        // 2. Apply sweet cute female acoustic parameters
-        tts?.setPitch(voicePitch)
-        tts?.setSpeechRate(voiceSpeed)
-
-        // 3. Find and activate high-quality female voice
-        applyFemaleVoice(targetLocale)
-
-        val utteranceId = "sweety_${System.currentTimeMillis()}"
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
-    /**
-     * Finds and applies the sweetest natural female voice in Google TTS
-     */
     private fun applyFemaleVoice(targetLocale: Locale) {
         try {
             val voices = tts?.voices ?: return
@@ -113,37 +164,45 @@ class MultilingualTextToSpeech(
                 val isMale = name.contains("male") || name.contains("-bic-") || name.contains("man") || name.contains("guy")
                 if (isMale) return@firstOrNull false
 
-                val isFemale = name.contains("female") ||
+                name.contains("female") ||
                         name.contains("woman") ||
                         name.contains("-fem-") ||
-                        name.contains("-ban-") || // Google Bengali Female BD
-                        name.contains("-bin-") || // Google Bengali Female IN 1
-                        name.contains("-bid-") || // Google Bengali Female IN 2
-                        name.contains("-sfg-") || // Google US Female
-                        name.contains("-iom-") || // Google US Female
-                        name.contains("-hie-") || // Google Hindi Female
+                        name.contains("-ban-") ||
+                        name.contains("-bin-") ||
+                        name.contains("-bid-") ||
+                        name.contains("-sfg-") ||
+                        name.contains("-iom-") ||
+                        name.contains("-hie-") ||
                         name.contains("-hia-")
-
-                isFemale
             }
 
             if (bestFemale != null) {
                 tts?.voice = bestFemale
-                Log.d(TAG, "Selected Sweet Female Voice: ${bestFemale.name}")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Voice selection notice: ${e.message}")
+            // Ignore
         }
     }
 
     fun stop() {
-        if (isInitialized) {
-            tts?.stop()
-        }
+        try {
+            if (mediaPlayer?.isPlaying == true) {
+                mediaPlayer?.stop()
+            }
+            mediaPlayer?.reset()
+            mediaPlayer?.release()
+            mediaPlayer = null
+        } catch (e: Exception) {}
+
+        try {
+            if (isTtsInitialized) {
+                tts?.stop()
+            }
+        } catch (e: Exception) {}
     }
 
     fun shutdown() {
-        tts?.stop()
+        stop()
         tts?.shutdown()
         tts = null
     }

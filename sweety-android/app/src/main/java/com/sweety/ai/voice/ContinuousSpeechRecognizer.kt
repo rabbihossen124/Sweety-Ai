@@ -26,93 +26,96 @@ class ContinuousSpeechRecognizer(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
-        initRecognizer()
+        ensureRecognizerReady()
     }
 
-    private fun initRecognizer() {
-        mainHandler.post {
-            try {
-                speechRecognizer?.destroy()
-                speechRecognizer = null
+    private fun ensureRecognizerReady(): Boolean {
+        if (speechRecognizer != null) return true
 
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                    setRecognitionListener(object : RecognitionListener {
-                        override fun onReadyForSpeech(params: Bundle?) {
-                            isListening = true
-                            onStateChange(true)
-                            Log.d(TAG, "SpeechRecognizer Ready for Speech")
-                        }
+        return try {
+            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                Log.w(TAG, "SpeechRecognizer not marked available on this device, attempting to create anyway")
+            }
 
-                        override fun onBeginningOfSpeech() {
-                            Log.d(TAG, "Speech input started")
-                        }
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        isListening = true
+                        onStateChange(true)
+                        Log.d(TAG, "SpeechRecognizer Ready for Speech")
+                    }
 
-                        override fun onRmsChanged(rmsdB: Float) {
+                    override fun onBeginningOfSpeech() {
+                        Log.d(TAG, "Speech input started")
+                    }
+
+                    override fun onRmsChanged(rmsdB: Float) {
+                        try {
                             val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
                             onRmsChanged(normalized)
-                        }
+                        } catch (e: Exception) {}
+                    }
 
-                        override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
 
-                        override fun onEndOfSpeech() {
+                    override fun onEndOfSpeech() {
+                        try {
                             onRmsChanged(0f)
                             Log.d(TAG, "Speech input ended")
-                        }
+                        } catch (e: Exception) {}
+                    }
 
-                        override fun onError(error: Int) {
-                            isListening = false
-                            onStateChange(false)
-                            onRmsChanged(0f)
-                            val errorMsg = getErrorMessage(error)
-                            Log.w(TAG, "SpeechRecognizer Error: $errorMsg ($error)")
+                    override fun onError(error: Int) {
+                        isListening = false
+                        onStateChange(false)
+                        onRmsChanged(0f)
+                        val errorMsg = getErrorMessage(error)
+                        Log.w(TAG, "SpeechRecognizer Error: $errorMsg ($error)")
 
-                            when (error) {
-                                SpeechRecognizer.ERROR_NO_MATCH,
-                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                                    // User didn't speak or quiet room
-                                    onErrorNotice("কিছু শুনতে পাইনি রাব্বি স্যার, আবার বলুন!")
-                                }
-                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
-                                    onErrorNotice("মাইক্রোফোন পারমিশন অন করা নেই!")
-                                }
-                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
-                                SpeechRecognizer.ERROR_CLIENT -> {
-                                    // Reset recognizer so next tap works cleanly
-                                    initRecognizer()
-                                }
-                                else -> {
-                                    // Other network or server glitch
-                                }
+                        when (error) {
+                            SpeechRecognizer.ERROR_NO_MATCH,
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
+                                onErrorNotice("কিছু শুনতে পাইনি রাব্বি স্যার, আবার বলুন!")
+                            }
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                                onErrorNotice("মাইক্রোফোন পারমিশন প্রয়োজন!")
+                            }
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                            SpeechRecognizer.ERROR_CLIENT -> {
+                                destroy()
                             }
                         }
+                    }
 
-                        override fun onResults(results: Bundle?) {
-                            isListening = false
-                            onStateChange(false)
-                            onRmsChanged(0f)
+                    override fun onResults(results: Bundle?) {
+                        isListening = false
+                        onStateChange(false)
+                        onRmsChanged(0f)
 
-                            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            val spokenText = matches?.firstOrNull() ?: ""
-                            Log.d(TAG, "Recognized Speech: $spokenText")
-                            if (spokenText.isNotBlank()) {
-                                onResult(spokenText)
-                            }
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val spokenText = matches?.firstOrNull() ?: ""
+                        Log.d(TAG, "Recognized Speech: $spokenText")
+                        if (spokenText.isNotBlank()) {
+                            onResult(spokenText)
                         }
+                    }
 
-                        override fun onPartialResults(partialResults: Bundle?) {
-                            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            val partial = matches?.firstOrNull() ?: ""
-                            if (partial.isNotBlank()) {
-                                Log.d(TAG, "Partial: $partial")
-                            }
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val partial = matches?.firstOrNull() ?: ""
+                        if (partial.isNotBlank()) {
+                            Log.d(TAG, "Partial recognition: $partial")
                         }
+                    }
 
-                        override fun onEvent(eventType: Int, params: Bundle?) {}
-                    })
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error initializing speech recognizer: ${e.message}")
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
             }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create SpeechRecognizer safely: ${e.message}")
+            speechRecognizer = null
+            false
         }
     }
 
@@ -128,47 +131,48 @@ class ContinuousSpeechRecognizer(
         }
 
         mainHandler.post {
-            if (speechRecognizer == null) {
-                initRecognizer()
-            }
+            try {
+                if (!ensureRecognizerReady()) {
+                    onErrorNotice("মাইক্রোফোন চালু করা যায়নি!")
+                    return@post
+                }
 
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
 
-                when (selectedLanguage) {
-                    "bn" -> {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                    }
-                    "hi" -> {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
-                    }
-                    "en" -> {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-US")
-                    }
-                    else -> {
-                        // Auto: default to Bengali Bangladesh with Hindi and English support
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US", "hi-IN", "bn-IN"))
+                    when (selectedLanguage) {
+                        "bn" -> {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
+                        }
+                        "hi" -> {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
+                        }
+                        "en" -> {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-US")
+                        }
+                        else -> {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
+                            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US", "hi-IN", "bn-IN"))
+                        }
                     }
                 }
-            }
 
-            try {
                 speechRecognizer?.startListening(intent)
                 isListening = true
                 onStateChange(true)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start listening: ${e.message}")
+                Log.e(TAG, "startListening safe catch: ${e.message}")
                 isListening = false
                 onStateChange(false)
-                initRecognizer()
+                destroy()
+                onErrorNotice("মাইক্রোফোন প্রস্তুত করা যায়নি, আবার চেষ্টা করুন!")
             }
         }
     }
@@ -178,7 +182,7 @@ class ContinuousSpeechRecognizer(
             try {
                 speechRecognizer?.stopListening()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to stop listening: ${e.message}")
+                Log.e(TAG, "stopListening safe catch: ${e.message}")
             }
             isListening = false
             onStateChange(false)
@@ -194,7 +198,7 @@ class ContinuousSpeechRecognizer(
             try {
                 speechRecognizer?.destroy()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to destroy recognizer: ${e.message}")
+                Log.e(TAG, "destroy safe catch: ${e.message}")
             }
             speechRecognizer = null
             isListening = false

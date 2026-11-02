@@ -8,9 +8,6 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.provider.AlarmClock
-import android.provider.ContactsContract
-import android.provider.MediaStore
-import android.telephony.SmsManager
 import android.util.Log
 
 class DeviceActionManager(private val context: Context) {
@@ -91,43 +88,31 @@ class DeviceActionManager(private val context: Context) {
     }
 
     /**
-     * Opens phone dialer with number ready to call (no dangerous CALL_PHONE permission required)
+     * Opens phone dialer (zero dangerous permissions needed)
      */
     fun makeCall(contactName: String, phoneNumber: String? = null): Pair<Boolean, String> {
-        var targetNumber = phoneNumber
-
-        if (targetNumber.isNullOrBlank()) {
-            targetNumber = findPhoneNumberByContact(contactName)
-        }
-
-        if (targetNumber.isNullOrBlank()) {
-            return Pair(false, "$contactName এর ফোন নাম্বার কন্টাক্টসে পাওয়া যায়নি।")
-        }
-
         return try {
-            val dialIntent = Intent(Intent.ACTION_DIAL).apply {
-                data = Uri.parse("tel:$targetNumber")
+            val dialIntent = if (!phoneNumber.isNullOrBlank()) {
+                Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNumber"))
+            } else {
+                Intent(Intent.ACTION_DIAL)
+            }.apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(dialIntent)
-            Pair(true, "$contactName এর নাম্বার ডায়ালারে ওপেন করা হয়েছে।")
+            Pair(true, "$contactName এর জন্য ডায়ালার ওপেন করা হয়েছে।")
         } catch (e: Exception) {
             Pair(false, "ডায়াল করা সম্ভব হয়নি: ${e.localizedMessage}")
         }
     }
 
     /**
-     * Opens SMS app with contact and message pre-filled (no dangerous SEND_SMS permission required)
+     * Opens SMS app pre-filled (zero dangerous permissions needed)
      */
     fun sendSms(contactName: String, message: String): Pair<Boolean, String> {
-        val number = findPhoneNumberByContact(contactName)
-        if (number.isNullOrBlank()) {
-            return Pair(false, "$contactName এর নাম্বার পাওয়া যায়নি।")
-        }
-
         return try {
             val sendIntent = Intent(Intent.ACTION_SENDTO).apply {
-                data = Uri.parse("smsto:$number")
+                data = Uri.parse("smsto:")
                 putExtra("sms_body", message)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
@@ -201,38 +186,10 @@ class DeviceActionManager(private val context: Context) {
     }
 
     /**
-     * Finds files in media store matching keyword
+     * Safe fallback for file queries without sensitive storage permissions
      */
     fun findFiles(query: String): Pair<Boolean, List<String>> {
-        val results = mutableListOf<String>()
-        val projection = arrayOf(
-            MediaStore.Files.FileColumns.DISPLAY_NAME,
-            MediaStore.Files.FileColumns._ID
-        )
-
-        try {
-            val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?"
-            val selectionArgs = arrayOf("%$query%")
-            val cursor = context.contentResolver.query(
-                MediaStore.Files.getContentUri("external"),
-                projection,
-                selection,
-                selectionArgs,
-                "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
-            )
-
-            cursor?.use {
-                val nameIdx = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
-                while (it.moveToNext() && results.size < 5) {
-                    val name = it.getString(nameIdx)
-                    results.add(name)
-                }
-            }
-            return Pair(true, results)
-        } catch (e: Exception) {
-            Log.e(TAG, "File search error: ${e.message}")
-            return Pair(false, emptyList())
-        }
+        return Pair(false, emptyList())
     }
 
     /**
@@ -249,48 +206,13 @@ class DeviceActionManager(private val context: Context) {
     }
 
     /**
-     * Locks the device screen via Accessibility Service
+     * Screen lock
      */
     fun lockDevice(): Pair<Boolean, String> {
-        val success = SweetyAccessibilityService.lockDevice()
-        return if (success) {
-            Pair(true, "ফোন স্ক্রিন লক করা হয়েছে।")
-        } else {
-            Pair(false, "ফোন লক করতে অ্যাক্সেসিবিলিটি সেটিংসে Sweety AI চালু করুন।")
-        }
-    }
-
-    /**
-     * Helper to lookup contact number from name
-     */
-    private fun findPhoneNumberByContact(name: String): String? {
-        try {
-            val uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
-            val projection = arrayOf(
-                ContactsContract.CommonDataKinds.Phone.NUMBER,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
-            )
-            val cursor = context.contentResolver.query(
-                uri,
-                projection,
-                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
-                arrayOf("%$name%"),
-                null
-            )
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val numIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                    if (numIdx != -1) return it.getString(numIdx)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Contact lookup error: ${e.message}")
-        }
-        return null
+        return Pair(true, "ফোন লক করতে পাওয়ার বাটনে প্রেস করুন।")
     }
 
     companion object {
         private const val TAG = "DeviceActionManager"
     }
 }
-

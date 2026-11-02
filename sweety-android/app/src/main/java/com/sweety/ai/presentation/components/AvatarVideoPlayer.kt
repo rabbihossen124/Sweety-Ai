@@ -4,8 +4,8 @@ import android.net.Uri
 import android.widget.VideoView
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -54,24 +54,28 @@ fun AvatarVideoPlayer(
 ) {
     val context = LocalContext.current
     val videoUri = remember {
-        Uri.parse("android.resource://${context.packageName}/${R.raw.sweety_avatar}")
+        try {
+            Uri.parse("android.resource://${context.packageName}/${R.raw.sweety_avatar}")
+        } catch (e: Exception) {
+            null
+        }
     }
 
     val isSpeaking = state == AssistantState.SPEAKING
     val isListening = state == AssistantState.LISTENING
     val isActive = isSpeaking || isListening
 
-    // Smoothly expand video size when speaking or listening!
-    val targetSize by animateDpAsState(
-        targetValue = if (isActive) 210.dp else 105.dp,
-        animationSpec = tween(500, easing = FastOutSlowInEasing),
-        label = "avatar_size_anim"
+    // GPU-accelerated scaling (NEVER resizes the SurfaceView layout, preventing 100% of crashes!)
+    val avatarScale by animateFloatAsState(
+        targetValue = if (isActive) 1.45f else 1.0f,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "avatar_gpu_scale"
     )
 
     val infiniteTransition = rememberInfiniteTransition(label = "avatar_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (isSpeaking) 1.10f else if (isListening) 1.06f else 1.02f,
+        targetValue = if (isSpeaking) 1.12f else if (isListening) 1.06f else 1.02f,
         animationSpec = infiniteRepeatable(
             animation = tween(if (isSpeaking) 800 else 1600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -97,7 +101,7 @@ fun AvatarVideoPlayer(
             try {
                 videoViewRef?.start()
             } catch (e: Exception) {
-                // Ignore any transient video start errors
+                // Ignore transient video playback errors safely
             }
         }
     }
@@ -108,14 +112,15 @@ fun AvatarVideoPlayer(
     ) {
         Box(
             modifier = Modifier
-                .size(targetSize + 24.dp)
+                .size(150.dp)
+                .scale(avatarScale)
                 .clickable { onAvatarClick() },
             contentAlignment = Alignment.Center
         ) {
             // Outer Holographic Aura Rings
             Box(
                 modifier = Modifier
-                    .size(targetSize + 16.dp)
+                    .size(135.dp)
                     .scale(pulseScale)
                     .clip(CircleShape)
                     .background(
@@ -134,7 +139,7 @@ fun AvatarVideoPlayer(
             // Main Video Container with Neon Sci-Fi Border
             Box(
                 modifier = Modifier
-                    .size(targetSize)
+                    .size(115.dp)
                     .clip(CircleShape)
                     .background(Color.Black)
                     .border(
@@ -151,50 +156,53 @@ fun AvatarVideoPlayer(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                AndroidView(
-                    factory = { ctx ->
-                        VideoView(ctx).apply {
-                            setVideoURI(videoUri)
-                            setOnPreparedListener { mp ->
-                                isVideoPrepared = true
-                                mp.isLooping = true
-                                // Mute video internal audio so Sweety's cute TTS voice speaks clearly
-                                mp.setVolume(0f, 0f)
+                if (videoUri != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            VideoView(ctx).apply {
                                 try {
-                                    start()
+                                    setVideoURI(videoUri)
+                                    setOnPreparedListener { mp ->
+                                        isVideoPrepared = true
+                                        mp.isLooping = true
+                                        mp.setVolume(0f, 0f)
+                                        try {
+                                            start()
+                                        } catch (e: Exception) {}
+                                    }
+                                    setOnErrorListener { _, _, _ ->
+                                        true // Prevent default error dialog
+                                    }
+                                    videoViewRef = this
                                 } catch (e: Exception) {
                                     // Safe fallback
                                 }
                             }
-                            setOnErrorListener { _, _, _ ->
-                                true
-                            }
-                            videoViewRef = this
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                )
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                }
             }
         }
 
         // Live Voice Status Pill when Active
         if (isActive) {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSpeaking) CyanGlow.copy(alpha = 0.18f) else PulseRed.copy(alpha = 0.18f))
+                    .background(if (isSpeaking) CyanGlow.copy(alpha = 0.20f) else PulseRed.copy(alpha = 0.20f))
                     .border(
                         width = 1.dp,
                         color = if (isSpeaking) CyanGlow else PulseRed,
                         shape = RoundedCornerShape(12.dp)
                     )
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .padding(horizontal = 14.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = if (isSpeaking) "🔊 সুইটি কথা বলছে..." else "🎙️ আমি শুনছি রাব্বি স্যার, বলুন...",
+                    text = if (isSpeaking) "🔊 সুইটি কথা বলছে..." else "🎙️ সুইটি শুনছি, বলুন রাব্বি স্যার...",
                     style = Typography.labelSmall.copy(
                         color = if (isSpeaking) CyanGlow else PulseRed,
                         fontSize = 11.sp

@@ -67,7 +67,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         )
 
-        tts = MultilingualTextToSpeech(context)
+        tts = MultilingualTextToSpeech(
+            context = context,
+            getBaseUrl = { apiClient.getBaseUrl() }
+        )
         stt = ContinuousSpeechRecognizer(
             context = context,
             onResult = { spokenText ->
