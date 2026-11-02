@@ -53,7 +53,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "Sweety AI Official Release (v1.0.9)"
+          name: "Sweety AI Official Release (v1.1.0)"
           draft: false
           prerelease: false
           files: |
