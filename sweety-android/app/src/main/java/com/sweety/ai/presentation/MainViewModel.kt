@@ -3,6 +3,7 @@ package com.sweety.ai.presentation
 import android.app.Application
 import android.content.Context
 import android.os.CountDownTimer
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sweety.ai.data.ActionPayload
@@ -14,6 +15,7 @@ import com.sweety.ai.device.DeviceActionManager
 import com.sweety.ai.domain.CommandDispatcher
 import com.sweety.ai.voice.ContinuousSpeechRecognizer
 import com.sweety.ai.voice.MultilingualTextToSpeech
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,15 +113,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleVoiceInput() {
-        if (_state.value == AssistantState.LISTENING) {
-            cancelFollowUpTimer()
-            stt?.stopListening()
-            _state.value = AssistantState.IDLE
-        } else {
-            cancelFollowUpTimer()
-            tts?.stop()
-            _state.value = AssistantState.LISTENING
-            stt?.startListening()
+        viewModelScope.launch(Dispatchers.Main) {
+            if (_state.value == AssistantState.LISTENING) {
+                cancelFollowUpTimer()
+                stt?.stopListening()
+                _state.value = AssistantState.IDLE
+            } else {
+                cancelFollowUpTimer()
+                tts?.stop()
+                _state.value = AssistantState.LISTENING
+                stt?.startListening()
+            }
         }
     }
 
@@ -136,38 +140,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // 2. Set thinking state
         _state.value = AssistantState.THINKING
 
-        viewModelScope.launch {
-            // 3. Fast-path local intent matching (~10ms execution without waiting for backend)
-            val fastMatch = commandDispatcher.tryFastLocalIntent(prompt)
-            if (fastMatch.first && fastMatch.second != null) {
-                val feedback = fastMatch.second!!
-                handleAssistantReply(feedback, actions = emptyList(), continueListening = true)
-                return@launch
-            }
-
-            // 4. Send to Node.js / Gemini Backend
-            val response = apiClient.sendChatMessage(
-                message = prompt,
-                sessionId = sessionId
-            )
-
-            if (response.success) {
-                // Execute any returned tool actions
-                val executedActions = mutableListOf<ActionPayload>()
-                for (action in response.actions) {
-                    commandDispatcher.dispatchAction(action) { success, feedback ->
-                        executedActions.add(action)
-                    }
+        viewModelScope.launch(Dispatchers.Main) {
+            try {
+                // 3. Fast-path local intent matching (~10ms execution without waiting for backend)
+                val fastMatch = commandDispatcher.tryFastLocalIntent(prompt)
+                if (fastMatch.first && fastMatch.second != null) {
+                    val feedback = fastMatch.second!!
+                    handleAssistantReply(feedback, actions = emptyList(), continueListening = true)
+                    return@launch
                 }
 
-                handleAssistantReply(
-                    text = response.text,
-                    actions = executedActions,
-                    continueListening = response.continueListening
+                // 4. Send to Node.js / Gemini Backend
+                val response = apiClient.sendChatMessage(
+                    message = prompt,
+                    sessionId = sessionId
                 )
-            } else {
+
+                if (response.success) {
+                    // Execute any returned tool actions
+                    val executedActions = mutableListOf<ActionPayload>()
+                    for (action in response.actions) {
+                        try {
+                            commandDispatcher.dispatchAction(action) { success, feedback ->
+                                executedActions.add(action)
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Action dispatch exception: ${e.message}")
+                        }
+                    }
+
+                    handleAssistantReply(
+                        text = response.text,
+                        actions = executedActions,
+                        continueListening = response.continueListening
+                    )
+                } else {
+                    handleAssistantReply(
+                        text = response.text,
+                        actions = emptyList(),
+                        continueListening = false
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "processUserPrompt error: ${e.message}")
                 handleAssistantReply(
-                    text = response.text,
+                    text = "দুঃখিত রাব্বি স্যার, একটি সমস্যা হয়েছে: ${e.localizedMessage ?: "সার্ভার এরর"}",
                     actions = emptyList(),
                     continueListening = false
                 )
@@ -191,10 +208,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = AssistantState.SPEAKING
         tts?.speak(text) {
             // On speech done:
-            if (continueListening) {
-                startContinuousListeningWindow()
-            } else {
-                _state.value = AssistantState.IDLE
+            viewModelScope.launch(Dispatchers.Main) {
+                if (continueListening) {
+                    startContinuousListeningWindow()
+                } else {
+                    _state.value = AssistantState.IDLE
+                }
             }
         }
     }
@@ -203,28 +222,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Re-arms mic for follow-up turns without repeating wake-word
      */
     private fun startContinuousListeningWindow() {
-        _state.value = AssistantState.LISTENING
-        stt?.startListening()
+        viewModelScope.launch(Dispatchers.Main) {
+            _state.value = AssistantState.LISTENING
+            stt?.startListening()
 
-        // 7-second countdown timer for next chained command
-        cancelFollowUpTimer()
-        followUpTimer = object : CountDownTimer(7000, 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                _countdownSeconds.value = (millisUntilFinished / 1000).toInt()
-            }
+            // 7-second countdown timer for next chained command
+            cancelFollowUpTimer()
+            try {
+                followUpTimer = object : CountDownTimer(7000, 1000) {
+                    override fun onTick(millisUntilFinished: Long) {
+                        _countdownSeconds.value = (millisUntilFinished / 1000).toInt()
+                    }
 
-            override fun onFinish() {
-                _countdownSeconds.value = 0
-                if (_state.value == AssistantState.LISTENING) {
-                    stt?.stopListening()
-                    _state.value = AssistantState.IDLE
-                }
+                    override fun onFinish() {
+                        _countdownSeconds.value = 0
+                        if (_state.value == AssistantState.LISTENING) {
+                            stt?.stopListening()
+                            _state.value = AssistantState.IDLE
+                        }
+                    }
+                }.start()
+            } catch (e: Exception) {
+                Log.w(TAG, "CountDownTimer startup error: ${e.message}")
             }
-        }.start()
+        }
     }
 
     private fun cancelFollowUpTimer() {
-        followUpTimer?.cancel()
+        try {
+            followUpTimer?.cancel()
+        } catch (e: Exception) {}
         followUpTimer = null
         _countdownSeconds.value = 0
     }
@@ -261,5 +288,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         tts?.shutdown()
         stt?.destroy()
     }
-}
 
+    companion object {
+        private const val TAG = "MainViewModel"
+    }
+}

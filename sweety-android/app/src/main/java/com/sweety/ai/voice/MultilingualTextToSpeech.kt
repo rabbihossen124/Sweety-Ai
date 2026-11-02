@@ -3,6 +3,8 @@ package com.sweety.ai.voice
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -17,7 +19,11 @@ class MultilingualTextToSpeech(
     private var tts: TextToSpeech? = null
     private var isTtsInitialized = false
     private var mediaPlayer: MediaPlayer? = null
+    private var isPlayerPreparing = false
+    private val playerLock = Any()
+
     private var onSpeechDoneCallback: (() -> Unit)? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // Sweet female pitch tuning for local fallback
     var voicePitch: Float = 1.25f
@@ -31,16 +37,22 @@ class MultilingualTextToSpeech(
     init {
         try {
             tts = TextToSpeech(context) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    isTtsInitialized = true
-                    tts?.setSpeechRate(voiceSpeed)
-                    tts?.setPitch(voicePitch)
-                    setupUtteranceListener()
-                    applyFemaleVoice(banglaLocale)
-                    Log.d(TAG, "Local TTS initialized as fallback")
-                    onInitComplete(true)
-                } else {
-                    onInitComplete(false)
+                mainHandler.post {
+                    if (status == TextToSpeech.SUCCESS) {
+                        isTtsInitialized = true
+                        try {
+                            tts?.setSpeechRate(voiceSpeed)
+                            tts?.setPitch(voicePitch)
+                            setupUtteranceListener()
+                            applyFemaleVoice(banglaLocale)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Local TTS post-init config warning: ${e.message}")
+                        }
+                        Log.d(TAG, "Local TTS initialized successfully")
+                        onInitComplete(true)
+                    } else {
+                        onInitComplete(false)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -52,21 +64,31 @@ class MultilingualTextToSpeech(
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) {
-                onSpeechDoneCallback?.invoke()
+                dispatchSpeechDone()
             }
             override fun onError(utteranceId: String?) {
-                onSpeechDoneCallback?.invoke()
+                dispatchSpeechDone()
             }
         })
     }
 
+    private fun dispatchSpeechDone() {
+        mainHandler.post {
+            try {
+                onSpeechDoneCallback?.invoke()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error invoking speech done callback: ${e.message}")
+            }
+        }
+    }
+
     /**
      * Speaks the text using Google's Neural Cloud Voice (Chat Experience),
-     * falling back to local TTS seamlessly if offline.
+     * falling back to local TTS seamlessly if offline or on network error.
      */
     fun speak(text: String, onDone: (() -> Unit)? = null) {
         if (text.isBlank()) {
-            onDone?.invoke()
+            mainHandler.post { onDone?.invoke() }
             return
         }
 
@@ -86,30 +108,58 @@ class MultilingualTextToSpeech(
             val base = getBaseUrl().trimEnd('/')
             val streamUrl = "$base/api/assistant/tts?text=$encodedText&lang=$lang"
 
-            mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
+            synchronized(playerLock) {
+                val player = MediaPlayer()
+                isPlayerPreparing = true
+                mediaPlayer = player
+
+                player.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .setUsage(AudioAttributes.USAGE_ASSISTANT)
                         .build()
                 )
-                setDataSource(streamUrl)
-                setOnPreparedListener { mp ->
-                    try {
-                        mp.start()
-                    } catch (e: Exception) {
-                        speakLocalFallback(text, onDone)
+
+                player.setDataSource(streamUrl)
+
+                player.setOnPreparedListener { mp ->
+                    synchronized(playerLock) {
+                        isPlayerPreparing = false
+                        if (mediaPlayer === mp) {
+                            try {
+                                mp.start()
+                            } catch (e: Exception) {
+                                Log.w(TAG, "MediaPlayer start failed, fallback to local TTS: ${e.message}")
+                                speakLocalFallback(text, onDone)
+                            }
+                        }
                     }
                 }
-                setOnCompletionListener {
-                    onSpeechDoneCallback?.invoke()
+
+                player.setOnCompletionListener {
+                    synchronized(playerLock) {
+                        isPlayerPreparing = false
+                    }
+                    dispatchSpeechDone()
                 }
-                setOnErrorListener { _, what, extra ->
+
+                player.setOnErrorListener { mp, what, extra ->
                     Log.w(TAG, "Cloud TTS stream error ($what, $extra), switching to local TTS fallback")
+                    synchronized(playerLock) {
+                        isPlayerPreparing = false
+                        try {
+                            mp.reset()
+                            mp.release()
+                        } catch (e: Exception) {}
+                        if (mediaPlayer === mp) {
+                            mediaPlayer = null
+                        }
+                    }
                     speakLocalFallback(text, onDone)
                     true
                 }
-                prepareAsync()
+
+                player.prepareAsync()
             }
         } catch (e: Exception) {
             Log.w(TAG, "Cloud TTS stream setup error: ${e.message}")
@@ -118,36 +168,38 @@ class MultilingualTextToSpeech(
     }
 
     private fun speakLocalFallback(text: String, onDone: (() -> Unit)?) {
-        if (!isTtsInitialized || tts == null) {
-            onDone?.invoke()
-            return
-        }
-
-        val targetLocale = when {
-            containsBangla(text) -> banglaLocale
-            containsHindi(text) -> hindiLocale
-            else -> englishLocale
-        }
-
-        try {
-            val result = tts?.setLanguage(targetLocale)
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                if (targetLocale == banglaLocale) {
-                    tts?.setLanguage(banglaIndiaLocale)
-                } else {
-                    tts?.language = Locale.getDefault()
-                }
+        mainHandler.post {
+            if (!isTtsInitialized || tts == null) {
+                onDone?.invoke()
+                return@post
             }
 
-            tts?.setPitch(voicePitch)
-            tts?.setSpeechRate(voiceSpeed)
-            applyFemaleVoice(targetLocale)
+            val targetLocale = when {
+                containsBangla(text) -> banglaLocale
+                containsHindi(text) -> hindiLocale
+                else -> englishLocale
+            }
 
-            val utteranceId = "sweety_${System.currentTimeMillis()}"
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
-        } catch (e: Exception) {
-            Log.e(TAG, "Local TTS fallback failed: ${e.message}")
-            onDone?.invoke()
+            try {
+                val result = tts?.setLanguage(targetLocale)
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    if (targetLocale == banglaLocale) {
+                        tts?.setLanguage(banglaIndiaLocale)
+                    } else {
+                        tts?.language = Locale.getDefault()
+                    }
+                }
+
+                tts?.setPitch(voicePitch)
+                tts?.setSpeechRate(voiceSpeed)
+                applyFemaleVoice(targetLocale)
+
+                val utteranceId = "sweety_${System.currentTimeMillis()}"
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Local TTS fallback failed: ${e.message}")
+                onDone?.invoke()
+            }
         }
     }
 
@@ -180,19 +232,32 @@ class MultilingualTextToSpeech(
                 tts?.voice = bestFemale
             }
         } catch (e: Exception) {
-            // Ignore
+            // Ignore safely
         }
     }
 
     fun stop() {
-        try {
-            if (mediaPlayer?.isPlaying == true) {
-                mediaPlayer?.stop()
-            }
-            mediaPlayer?.reset()
-            mediaPlayer?.release()
+        synchronized(playerLock) {
+            try {
+                mediaPlayer?.let { mp ->
+                    if (!isPlayerPreparing) {
+                        try {
+                            if (mp.isPlaying) {
+                                mp.stop()
+                            }
+                        } catch (e: Exception) {}
+                    }
+                    try {
+                        mp.reset()
+                    } catch (e: Exception) {}
+                    try {
+                        mp.release()
+                    } catch (e: Exception) {}
+                }
+            } catch (e: Exception) {}
             mediaPlayer = null
-        } catch (e: Exception) {}
+            isPlayerPreparing = false
+        }
 
         try {
             if (isTtsInitialized) {
@@ -203,7 +268,9 @@ class MultilingualTextToSpeech(
 
     fun shutdown() {
         stop()
-        tts?.shutdown()
+        try {
+            tts?.shutdown()
+        } catch (e: Exception) {}
         tts = null
     }
 

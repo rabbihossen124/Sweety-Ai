@@ -14,20 +14,14 @@ import androidx.core.content.ContextCompat
 import com.sweety.ai.presentation.MainScreen
 import com.sweety.ai.presentation.MainViewModel
 import com.sweety.ai.presentation.theme.SweetyAITheme
-import com.sweety.ai.sensor.ClapDetectorService
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
-    private val requiredPermissions = buildList {
-        add(Manifest.permission.RECORD_AUDIO)
-        add(Manifest.permission.CAMERA)
-        add(Manifest.permission.READ_CONTACTS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
+    private val requiredPermissions = listOf(
+        Manifest.permission.RECORD_AUDIO
+    )
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -41,29 +35,13 @@ class MainActivity : ComponentActivity() {
         // Enable display and wake-up over lock screen
         setupLockScreenVisibility()
 
-        // Check and request runtime permissions
+        // Check and request runtime microphone permission
         checkAndRequestPermissions()
-
-        // Handle auto-listen if launched by 2-clap detector
-        handleClapTrigger(intent)
 
         setContent {
             SweetyAITheme {
                 MainScreen(viewModel = viewModel)
             }
-        }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleClapTrigger(intent)
-    }
-
-    private fun handleClapTrigger(intent: Intent?) {
-        val clapTriggered = intent?.getBooleanExtra(ClapDetectorService.EXTRA_CLAP_TRIGGERED, false) == true
-        if (clapTriggered) {
-            viewModel.toggleVoiceInput()
         }
     }
 
@@ -91,4 +69,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

@@ -3,3 +3,4 @@
     <background android:drawable="@color/dark_background" />
     <foreground android:drawable="@drawable/ic_sweety_logo" />
 </adaptive-icon>
+

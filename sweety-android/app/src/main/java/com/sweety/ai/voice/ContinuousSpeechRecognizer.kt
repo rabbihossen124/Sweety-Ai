@@ -26,23 +26,25 @@ class ContinuousSpeechRecognizer(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
-        ensureRecognizerReady()
+        mainHandler.post {
+            ensureRecognizerReady()
+        }
     }
 
     private fun ensureRecognizerReady(): Boolean {
         if (speechRecognizer != null) return true
 
         return try {
-            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-                Log.w(TAG, "SpeechRecognizer not marked available on this device, attempting to create anyway")
-            }
-
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
-                        isListening = true
-                        onStateChange(true)
-                        Log.d(TAG, "SpeechRecognizer Ready for Speech")
+                        try {
+                            isListening = true
+                            onStateChange(true)
+                            Log.d(TAG, "SpeechRecognizer Ready for Speech")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "onReadyForSpeech callback error: ${e.message}")
+                        }
                     }
 
                     override fun onBeginningOfSpeech() {
@@ -66,46 +68,59 @@ class ContinuousSpeechRecognizer(
                     }
 
                     override fun onError(error: Int) {
-                        isListening = false
-                        onStateChange(false)
-                        onRmsChanged(0f)
-                        val errorMsg = getErrorMessage(error)
-                        Log.w(TAG, "SpeechRecognizer Error: $errorMsg ($error)")
+                        try {
+                            isListening = false
+                            onStateChange(false)
+                            onRmsChanged(0f)
+                            val errorMsg = getErrorMessage(error)
+                            Log.w(TAG, "SpeechRecognizer Error: $errorMsg ($error)")
 
-                        when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH,
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                                onErrorNotice("কিছু শুনতে পাইনি রাব্বি স্যার, আবার বলুন!")
+                            when (error) {
+                                SpeechRecognizer.ERROR_NO_MATCH,
+                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
+                                    onErrorNotice("কিছু শুনতে পাইনি রাব্বি স্যার, আবার বলুন!")
+                                }
+                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                                    onErrorNotice("মাইক্রোফোন পারমিশন প্রয়োজন!")
+                                }
+                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                                SpeechRecognizer.ERROR_CLIENT -> {
+                                    // Soft reset
+                                    try {
+                                        speechRecognizer?.cancel()
+                                    } catch (e: Exception) {}
+                                }
                             }
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
-                                onErrorNotice("মাইক্রোফোন পারমিশন প্রয়োজন!")
-                            }
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
-                            SpeechRecognizer.ERROR_CLIENT -> {
-                                destroy()
-                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "onError callback exception: ${e.message}")
                         }
                     }
 
                     override fun onResults(results: Bundle?) {
-                        isListening = false
-                        onStateChange(false)
-                        onRmsChanged(0f)
+                        try {
+                            isListening = false
+                            onStateChange(false)
+                            onRmsChanged(0f)
 
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val spokenText = matches?.firstOrNull() ?: ""
-                        Log.d(TAG, "Recognized Speech: $spokenText")
-                        if (spokenText.isNotBlank()) {
-                            onResult(spokenText)
+                            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            val spokenText = matches?.firstOrNull() ?: ""
+                            Log.d(TAG, "Recognized Speech: $spokenText")
+                            if (spokenText.isNotBlank()) {
+                                onResult(spokenText)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "onResults callback error: ${e.message}")
                         }
                     }
 
                     override fun onPartialResults(partialResults: Bundle?) {
-                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val partial = matches?.firstOrNull() ?: ""
-                        if (partial.isNotBlank()) {
-                            Log.d(TAG, "Partial recognition: $partial")
-                        }
+                        try {
+                            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            val partial = matches?.firstOrNull() ?: ""
+                            if (partial.isNotBlank()) {
+                                Log.d(TAG, "Partial recognition: $partial")
+                            }
+                        } catch (e: Exception) {}
                     }
 
                     override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -171,7 +186,6 @@ class ContinuousSpeechRecognizer(
                 Log.e(TAG, "startListening safe catch: ${e.message}")
                 isListening = false
                 onStateChange(false)
-                destroy()
                 onErrorNotice("মাইক্রোফোন প্রস্তুত করা যায়নি, আবার চেষ্টা করুন!")
             }
         }
