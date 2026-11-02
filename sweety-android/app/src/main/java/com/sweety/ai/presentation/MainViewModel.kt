@@ -61,39 +61,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var sessionId: String = "session_${System.currentTimeMillis()}"
 
     init {
-        commandDispatcher = CommandDispatcher(
-            deviceManager = deviceManager,
-            onConfirmationRequired = { confirm ->
-                _state.value = AssistantState.WAITING_CONFIRMATION
-                _pendingConfirmation.value = confirm
-            }
-        )
+        try {
+            commandDispatcher = CommandDispatcher(
+                deviceManager = deviceManager,
+                onConfirmationRequired = { confirm ->
+                    _state.value = AssistantState.WAITING_CONFIRMATION
+                    _pendingConfirmation.value = confirm
+                }
+            )
 
-        tts = MultilingualTextToSpeech(
-            context = context,
-            getBaseUrl = { apiClient.getBaseUrl() }
-        )
-        stt = ContinuousSpeechRecognizer(
-            context = context,
-            onResult = { spokenText ->
-                processUserPrompt(spokenText)
-            },
-            onRmsChanged = { rms ->
-                _audioRms.value = rms
-            },
-            onStateChange = { isListening ->
-                if (isListening && _state.value != AssistantState.SPEAKING && _state.value != AssistantState.THINKING) {
-                    _state.value = AssistantState.LISTENING
-                } else if (!isListening && _state.value == AssistantState.LISTENING) {
-                    _state.value = AssistantState.IDLE
+            tts = MultilingualTextToSpeech(
+                context = context,
+                getBaseUrl = { apiClient.getBaseUrl() }
+            )
+
+            stt = ContinuousSpeechRecognizer(
+                context = context,
+                onResult = { spokenText ->
+                    processUserPrompt(spokenText, fromVoice = true)
+                },
+                onRmsChanged = { rms ->
+                    _audioRms.value = rms
+                },
+                onStateChange = { isListening ->
+                    if (isListening && _state.value != AssistantState.SPEAKING && _state.value != AssistantState.THINKING) {
+                        _state.value = AssistantState.LISTENING
+                    } else if (!isListening && _state.value == AssistantState.LISTENING) {
+                        _state.value = AssistantState.IDLE
+                    }
+                },
+                onErrorNotice = { notice ->
+                    if (_state.value == AssistantState.LISTENING) {
+                        _state.value = AssistantState.IDLE
+                    }
                 }
-            },
-            onErrorNotice = { notice ->
-                if (_state.value == AssistantState.LISTENING) {
-                    _state.value = AssistantState.IDLE
-                }
-            }
-        )
+            )
+        } catch (t: Throwable) {
+            Log.e(TAG, "MainViewModel init error: ${t.message}", t)
+        }
     }
 
     fun testCuteVoice() {
@@ -114,24 +119,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleVoiceInput() {
         viewModelScope.launch(Dispatchers.Main) {
-            if (_state.value == AssistantState.LISTENING) {
-                cancelFollowUpTimer()
-                stt?.stopListening()
+            try {
+                if (_state.value == AssistantState.LISTENING) {
+                    cancelFollowUpTimer()
+                    stt?.stopListening()
+                    _state.value = AssistantState.IDLE
+                } else {
+                    cancelFollowUpTimer()
+                    tts?.stop()
+                    _state.value = AssistantState.LISTENING
+                    stt?.startListening()
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "toggleVoiceInput error: ${t.message}")
                 _state.value = AssistantState.IDLE
-            } else {
-                cancelFollowUpTimer()
-                tts?.stop()
-                _state.value = AssistantState.LISTENING
-                stt?.startListening()
             }
         }
     }
 
-    fun processUserPrompt(prompt: String) {
+    fun processUserPrompt(prompt: String, fromVoice: Boolean = false) {
         if (prompt.isBlank()) return
 
         cancelFollowUpTimer()
-        stt?.stopListening()
+        try {
+            stt?.stopListening()
+        } catch (t: Throwable) {}
 
         // 1. Add user message to chat UI
         val userMsg = ChatMessage(text = prompt, isUser = true)
@@ -146,7 +158,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val fastMatch = commandDispatcher.tryFastLocalIntent(prompt)
                 if (fastMatch.first && fastMatch.second != null) {
                     val feedback = fastMatch.second!!
-                    handleAssistantReply(feedback, actions = emptyList(), continueListening = true)
+                    handleAssistantReply(feedback, actions = emptyList(), continueListening = fromVoice)
                     return@launch
                 }
 
@@ -172,7 +184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     handleAssistantReply(
                         text = response.text,
                         actions = executedActions,
-                        continueListening = response.continueListening
+                        continueListening = if (fromVoice) response.continueListening else false
                     )
                 } else {
                     handleAssistantReply(
@@ -206,15 +218,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Speak response via Multilingual TTS
         _state.value = AssistantState.SPEAKING
-        tts?.speak(text) {
-            // On speech done:
-            viewModelScope.launch(Dispatchers.Main) {
-                if (continueListening) {
-                    startContinuousListeningWindow()
-                } else {
-                    _state.value = AssistantState.IDLE
+        try {
+            tts?.speak(text) {
+                // On speech done:
+                viewModelScope.launch(Dispatchers.Main) {
+                    try {
+                        if (continueListening) {
+                            startContinuousListeningWindow()
+                        } else {
+                            _state.value = AssistantState.IDLE
+                        }
+                    } catch (t: Throwable) {
+                        _state.value = AssistantState.IDLE
+                    }
                 }
             }
+        } catch (t: Throwable) {
+            Log.e(TAG, "TTS speak error: ${t.message}")
+            _state.value = AssistantState.IDLE
         }
     }
 
@@ -223,12 +244,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun startContinuousListeningWindow() {
         viewModelScope.launch(Dispatchers.Main) {
-            _state.value = AssistantState.LISTENING
-            stt?.startListening()
-
-            // 7-second countdown timer for next chained command
-            cancelFollowUpTimer()
             try {
+                _state.value = AssistantState.LISTENING
+                stt?.startListening()
+
+                // 7-second countdown timer for next chained command
+                cancelFollowUpTimer()
                 followUpTimer = object : CountDownTimer(7000, 1000) {
                     override fun onTick(millisUntilFinished: Long) {
                         _countdownSeconds.value = (millisUntilFinished / 1000).toInt()
@@ -242,8 +263,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }.start()
-            } catch (e: Exception) {
-                Log.w(TAG, "CountDownTimer startup error: ${e.message}")
+            } catch (t: Throwable) {
+                Log.w(TAG, "CountDownTimer startup error: ${t.message}")
+                _state.value = AssistantState.IDLE
             }
         }
     }
@@ -267,7 +289,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startNewChat() {
         cancelFollowUpTimer()
-        stt?.stopListening()
+        try {
+            stt?.stopListening()
+        } catch (t: Throwable) {}
+
         val greeting = com.sweety.ai.domain.GreetingHelper.generateWelcomeGreeting("রাব্বি স্যার")
         _messages.value = listOf(
             ChatMessage(
@@ -277,16 +302,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         sessionId = "session_${System.currentTimeMillis()}"
         _state.value = AssistantState.SPEAKING
-        tts?.speak(greeting) {
-            startContinuousListeningWindow()
+        try {
+            tts?.speak(greeting) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    _state.value = AssistantState.IDLE
+                }
+            }
+        } catch (t: Throwable) {
+            _state.value = AssistantState.IDLE
         }
     }
 
     override fun onCleared() {
         super.onCleared()
         cancelFollowUpTimer()
-        tts?.shutdown()
-        stt?.destroy()
+        try {
+            tts?.shutdown()
+        } catch (t: Throwable) {}
+        try {
+            stt?.destroy()
+        } catch (t: Throwable) {}
     }
 
     companion object {

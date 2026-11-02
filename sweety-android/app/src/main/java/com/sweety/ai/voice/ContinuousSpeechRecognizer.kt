@@ -27,7 +27,11 @@ class ContinuousSpeechRecognizer(
 
     init {
         mainHandler.post {
-            ensureRecognizerReady()
+            try {
+                ensureRecognizerReady()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Init ensureRecognizerReady error: ${t.message}")
+            }
         }
     }
 
@@ -35,6 +39,11 @@ class ContinuousSpeechRecognizer(
         if (speechRecognizer != null) return true
 
         return try {
+            val available = SpeechRecognizer.isRecognitionAvailable(context)
+            if (!available) {
+                Log.w(TAG, "Speech recognition is marked not available on this device")
+            }
+
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
@@ -42,20 +51,22 @@ class ContinuousSpeechRecognizer(
                             isListening = true
                             onStateChange(true)
                             Log.d(TAG, "SpeechRecognizer Ready for Speech")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "onReadyForSpeech callback error: ${e.message}")
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "onReadyForSpeech error: ${t.message}")
                         }
                     }
 
                     override fun onBeginningOfSpeech() {
-                        Log.d(TAG, "Speech input started")
+                        try {
+                            Log.d(TAG, "Speech input started")
+                        } catch (t: Throwable) {}
                     }
 
                     override fun onRmsChanged(rmsdB: Float) {
                         try {
                             val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
                             onRmsChanged(normalized)
-                        } catch (e: Exception) {}
+                        } catch (t: Throwable) {}
                     }
 
                     override fun onBufferReceived(buffer: ByteArray?) {}
@@ -64,7 +75,7 @@ class ContinuousSpeechRecognizer(
                         try {
                             onRmsChanged(0f)
                             Log.d(TAG, "Speech input ended")
-                        } catch (e: Exception) {}
+                        } catch (t: Throwable) {}
                     }
 
                     override fun onError(error: Int) {
@@ -85,14 +96,13 @@ class ContinuousSpeechRecognizer(
                                 }
                                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
                                 SpeechRecognizer.ERROR_CLIENT -> {
-                                    // Soft reset
                                     try {
                                         speechRecognizer?.cancel()
-                                    } catch (e: Exception) {}
+                                    } catch (t: Throwable) {}
                                 }
                             }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "onError callback exception: ${e.message}")
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "onError callback exception: ${t.message}")
                         }
                     }
 
@@ -108,8 +118,8 @@ class ContinuousSpeechRecognizer(
                             if (spokenText.isNotBlank()) {
                                 onResult(spokenText)
                             }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "onResults callback error: ${e.message}")
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "onResults callback error: ${t.message}")
                         }
                     }
 
@@ -120,25 +130,29 @@ class ContinuousSpeechRecognizer(
                             if (partial.isNotBlank()) {
                                 Log.d(TAG, "Partial recognition: $partial")
                             }
-                        } catch (e: Exception) {}
+                        } catch (t: Throwable) {}
                     }
 
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
             true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create SpeechRecognizer safely: ${e.message}")
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to create SpeechRecognizer safely: ${t.message}")
             speechRecognizer = null
             false
         }
     }
 
     fun startListening() {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasPermission = try {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        } catch (t: Throwable) {
+            false
+        }
 
         if (!hasPermission) {
             onErrorNotice("মাইক্রোফোন পারমিশন প্রয়োজন!")
@@ -149,6 +163,8 @@ class ContinuousSpeechRecognizer(
             try {
                 if (!ensureRecognizerReady()) {
                     onErrorNotice("মাইক্রোফোন চালু করা যায়নি!")
+                    isListening = false
+                    onStateChange(false)
                     return@post
                 }
 
@@ -174,7 +190,11 @@ class ContinuousSpeechRecognizer(
                         else -> {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US", "hi-IN", "bn-IN"))
+                            // Correct Type: MUST be ArrayList<String> for RecognizerIntent Bundle
+                            putExtra(
+                                "android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES",
+                                arrayListOf("en-US", "hi-IN", "bn-IN")
+                            )
                         }
                     }
                 }
@@ -182,8 +202,8 @@ class ContinuousSpeechRecognizer(
                 speechRecognizer?.startListening(intent)
                 isListening = true
                 onStateChange(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "startListening safe catch: ${e.message}")
+            } catch (t: Throwable) {
+                Log.e(TAG, "startListening safe catch: ${t.message}", t)
                 isListening = false
                 onStateChange(false)
                 onErrorNotice("মাইক্রোফোন প্রস্তুত করা যায়নি, আবার চেষ্টা করুন!")
@@ -195,8 +215,8 @@ class ContinuousSpeechRecognizer(
         mainHandler.post {
             try {
                 speechRecognizer?.stopListening()
-            } catch (e: Exception) {
-                Log.e(TAG, "stopListening safe catch: ${e.message}")
+            } catch (t: Throwable) {
+                Log.e(TAG, "stopListening safe catch: ${t.message}")
             }
             isListening = false
             onStateChange(false)
@@ -211,8 +231,8 @@ class ContinuousSpeechRecognizer(
         mainHandler.post {
             try {
                 speechRecognizer?.destroy()
-            } catch (e: Exception) {
-                Log.e(TAG, "destroy safe catch: ${e.message}")
+            } catch (t: Throwable) {
+                Log.e(TAG, "destroy safe catch: ${t.message}")
             }
             speechRecognizer = null
             isListening = false

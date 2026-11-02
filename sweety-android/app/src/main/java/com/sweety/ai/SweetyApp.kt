@@ -4,13 +4,28 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import android.util.Log
 
 class SweetyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
         instance = this
+        setupGlobalCrashGuard()
         createNotificationChannels()
+    }
+
+    private fun setupGlobalCrashGuard() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e("SweetyCrashGuard", "Caught uncaught exception in thread ${thread.name}: ${throwable.message}", throwable)
+            // Log details safely without hard termination if possible
+            try {
+                defaultHandler?.uncaughtException(thread, throwable)
+            } catch (e: Exception) {
+                Log.e("SweetyCrashGuard", "Secondary error in crash handler: ${e.message}")
+            }
+        }
     }
 
     private fun createNotificationChannels() {
@@ -33,4 +48,3 @@ class SweetyApp : Application() {
             private set
     }
 }
-
