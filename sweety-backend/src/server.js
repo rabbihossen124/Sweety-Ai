@@ -114,9 +114,9 @@ app.get("/", (req, res) => {
     <body>
       <div class="card">
         <h1>✨ Sweety AI Official</h1>
-        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.0.8 - Live Avatar & Patient Listening)</p>
+        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.0.9 - Live Avatar Video & Patient Mic)</p>
         
-        <a class="btn-primary" href="/download">📲 ১ ক্লিকে ইনস্টল (সরাসরি APK v1.0.8)</a>
+        <a class="btn-primary" href="/download">📲 ১ ক্লিকে ইনস্টল (সরাসরি APK v1.0.9)</a>
         <a class="btn-secondary" href="/release">⭐ অফিসিয়াল রিলিজ APK</a>
 
         <div class="tip">

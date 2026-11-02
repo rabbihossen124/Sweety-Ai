@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.sweety.ai.presentation.MainScreen
 import com.sweety.ai.presentation.MainViewModel
 import com.sweety.ai.presentation.theme.SweetyAITheme
+import com.sweety.ai.sensor.ClapDetectorService
 
 class MainActivity : ComponentActivity() {
 
