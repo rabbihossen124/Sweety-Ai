@@ -53,19 +53,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Accessibility Service for Instant Screen Lock & Global Actions -->
-        <service
-            android:name=".device.SweetyAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
         <!-- 2-Clap Wake Detection Foreground Service -->
         <service
             android:name=".sensor.ClapDetectorService"

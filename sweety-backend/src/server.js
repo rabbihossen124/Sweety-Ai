@@ -25,13 +25,17 @@ app.get("/api/health", (req, res) => {
 // Assistant endpoints
 app.use("/api/assistant", assistantRoutes);
 
-// Download redirect route for easy mobile installation
+// Download redirect routes
 app.get("/download", (req, res) => {
+  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI-Debug.apk");
+});
+
+app.get("/release", (req, res) => {
   res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI.apk");
 });
 
 app.get("/app", (req, res) => {
-  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI.apk");
+  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI-Debug.apk");
 });
 
 // Root route
@@ -58,28 +62,44 @@ app.get("/", (req, res) => {
           padding: 20px;
         }
         .card {
-          background: rgba(15, 23, 42, 0.8);
+          background: rgba(15, 23, 42, 0.9);
           border: 1px solid #00E5FF;
-          border-radius: 20px;
+          border-radius: 24px;
           padding: 30px;
-          max-width: 420px;
-          box-shadow: 0 0 30px rgba(0, 229, 255, 0.2);
+          max-width: 440px;
+          box-shadow: 0 0 30px rgba(0, 229, 255, 0.25);
         }
         h1 { color: #00E5FF; margin-bottom: 8px; font-size: 26px; }
         p { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
-        .btn {
-          display: inline-block;
-          background: linear-gradient(135deg, #00E5FF, #7C4DFF);
+        .btn-primary {
+          display: block;
+          background: linear-gradient(135deg, #00E5FF, #00B0FF);
           color: #000;
           font-weight: bold;
           font-size: 16px;
-          padding: 14px 28px;
+          padding: 15px 24px;
           border-radius: 30px;
           text-decoration: none;
-          box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
-          transition: transform 0.2s;
+          box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+          margin-bottom: 14px;
         }
-        .btn:active { transform: scale(0.96); }
+        .btn-secondary {
+          display: block;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(0, 229, 255, 0.4);
+          color: #00E5FF;
+          font-weight: 600;
+          font-size: 14px;
+          padding: 12px 20px;
+          border-radius: 30px;
+          text-decoration: none;
+        }
+        .tip {
+          margin-top: 18px;
+          font-size: 12px;
+          color: #64748b;
+          line-height: 1.5;
+        }
         .badge {
           margin-top: 20px;
           font-size: 12px;
@@ -94,10 +114,16 @@ app.get("/", (req, res) => {
     <body>
       <div class="card">
         <h1>✨ Sweety AI Official</h1>
-        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.0.1)</p>
-        <a class="btn" href="/download">📲 Download Sweety AI (APK)</a>
-        <br>
-        <div class="badge">🚀 Backend Status: Active & Ready</div>
+        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.0.2)</p>
+        
+        <a class="btn-primary" href="/download">📲 ১ ক্লিকে ইনস্টল (সরাসরি APK)</a>
+        <a class="btn-secondary" href="/release">⭐ অফিসিয়াল রিলিজ APK</a>
+
+        <div class="tip">
+          💡 ডাউনলোড করার পর ফাইলে ক্লিক করলেই ফোনে ইনস্টল শুরু হয়ে যাবে।
+        </div>
+        
+        <div class="badge">🚀 Backend Status: Active & Connected</div>
       </div>
     </body>
     </html>
