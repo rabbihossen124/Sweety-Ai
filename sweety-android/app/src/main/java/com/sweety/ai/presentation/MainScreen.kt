@@ -3,6 +3,7 @@ package com.sweety.ai.presentation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +11,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
@@ -105,25 +108,25 @@ fun MainScreen(viewModel: MainViewModel) {
             .fillMaxSize()
             .background(DarkVoid)
     ) {
-        // Futuristic Sweety AI Companion Background Art (Semi-transparent)
+        // High-clarity Sweety AI Companion Background Art (Bright & Vivid)
         Image(
             painter = painterResource(id = R.drawable.sweety_bg),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            alpha = 0.35f // Elegant transparency so art shines through without obstructing text
+            alpha = 0.85f // High clarity so Rabbi Sir's photo and poster are vivid and sharp!
         )
 
-        // Gradient dark scrim overlay for optimal text contrast and neon glow
+        // Gradient dark scrim overlay ONLY at top and bottom edges so the middle artwork is 100% visible
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            DarkVoid.copy(alpha = 0.75f),
+                            DarkVoid.copy(alpha = 0.45f),
                             Color.Transparent,
-                            DarkVoid.copy(alpha = 0.85f)
+                            DarkVoid.copy(alpha = 0.65f)
                         )
                     )
                 )
@@ -193,6 +196,30 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // ➕ New Chat Button
+                    Button(
+                        onClick = { viewModel.startNewChat() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ElectricCyan.copy(alpha = 0.22f)
+                        ),
+                        border = BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.7f)),
+                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(end = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = "New Chat",
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "New Chat",
+                            style = Typography.labelSmall.copy(color = ElectricCyan, fontSize = 11.sp)
+                        )
+                    }
+
                     // Language Switcher Pill
                     val langLabel = when (selectedLanguage) {
                         "bn" -> "বাংলা"
@@ -260,7 +287,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 })
             }
 
-            // Holographic Animated Video Avatar of Sweety AI
+            // Holographic Animated Video Avatar of Sweety AI (Expands live when speaking / listening!)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -269,7 +296,7 @@ fun MainScreen(viewModel: MainViewModel) {
             ) {
                 AvatarVideoPlayer(
                     state = state,
-                    size = 115.dp
+                    onAvatarClick = { viewModel.toggleVoiceInput() }
                 )
             }
 

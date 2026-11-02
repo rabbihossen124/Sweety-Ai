@@ -220,13 +220,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearChat() {
+        startNewChat()
+    }
+
+    fun startNewChat() {
+        cancelFollowUpTimer()
+        stt?.stopListening()
+        val greeting = com.sweety.ai.domain.GreetingHelper.generateWelcomeGreeting("রাব্বি স্যার")
         _messages.value = listOf(
             ChatMessage(
-                text = "চ্যাট হিস্ট্রি রিসেট করা হয়েছে। আমি প্রস্তুত বস!",
+                text = greeting,
                 isUser = false
             )
         )
         sessionId = "session_${System.currentTimeMillis()}"
+        _state.value = AssistantState.SPEAKING
+        tts?.speak(greeting) {
+            startContinuousListeningWindow()
+        }
     }
 
     override fun onCleared() {
