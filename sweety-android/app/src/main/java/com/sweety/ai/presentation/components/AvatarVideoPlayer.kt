@@ -2,6 +2,7 @@ package com.sweety.ai.presentation.components
 
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
+import android.net.Uri
 import android.util.Log
 import android.view.Surface
 import android.view.TextureView
@@ -137,61 +138,52 @@ fun AvatarVideoPlayer(
     }
 
     // Live Video Player using TextureView (100% crash-free)
-    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    val mediaPlayer = remember { MediaPlayer() }
     var isVideoReady by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
-        val player = MediaPlayer()
         try {
-            val afd = context.resources.openRawResourceFd(R.raw.sweety_avatar)
-            if (afd != null) {
-                player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
-                player.isLooping = true
-                player.setVolume(0f, 0f)
-                player.setOnPreparedListener {
-                    isVideoReady = true
-                    if (isActive) {
-                        try { player.start() } catch (e: Exception) {}
-                    }
+            val videoUri = Uri.parse("android.resource://${context.packageName}/${R.raw.sweety_avatar}")
+            mediaPlayer.setDataSource(context, videoUri)
+            mediaPlayer.isLooping = true
+            mediaPlayer.setVolume(0f, 0f)
+            mediaPlayer.setOnPreparedListener {
+                isVideoReady = true
+                if (isActive) {
+                    try { mediaPlayer.start() } catch (e: Exception) {}
                 }
-                player.prepareAsync()
             }
+            mediaPlayer.prepareAsync()
         } catch (e: Exception) {
-            Log.w("AvatarVideoPlayer", "Could not load sweety_avatar raw video: ${e.message}")
+            Log.w("AvatarVideoPlayer", "Could not initialize avatar video: ${e.message}")
         }
-        mediaPlayer = player
 
         onDispose {
             try {
-                player.stop()
+                mediaPlayer.stop()
             } catch (e: Exception) {}
             try {
-                player.reset()
-                player.release()
+                mediaPlayer.reset()
+                mediaPlayer.release()
             } catch (e: Exception) {}
-            mediaPlayer = null
-            isVideoReady = false
         }
     }
 
     // React to speaking / listening states to start or pause avatar video
     LaunchedEffect(isActive, isVideoReady) {
-        mediaPlayer?.let { player ->
-            if (isVideoReady) {
-                try {
-                    if (isActive) {
-                        if (!player.isPlaying) {
-                            player.start()
-                        }
-                    } else {
-                        if (player.isPlaying) {
-                            player.pause()
-                        }
+        if (isVideoReady) {
+            try {
+                if (isActive) {
+                    if (!mediaPlayer.isPlaying) {
+                        mediaPlayer.start()
                     }
-                } catch (e: Exception) {
-                    Log.w("AvatarVideoPlayer", "Player start/pause error: ${e.message}")
+                } else {
+                    if (mediaPlayer.isPlaying) {
+                        mediaPlayer.pause()
+                    }
                 }
+            } catch (e: Exception) {
+                Log.w("AvatarVideoPlayer", "Player start/pause error: ${e.message}")
             }
         }
     }
@@ -299,9 +291,9 @@ fun AvatarVideoPlayer(
                                 ) {
                                     try {
                                         val surface = Surface(surfaceTexture)
-                                        mediaPlayer?.setSurface(surface)
+                                        mediaPlayer.setSurface(surface)
                                         if (isActive && isVideoReady) {
-                                            try { mediaPlayer?.start() } catch (e: Exception) {}
+                                            try { mediaPlayer.start() } catch (e: Exception) {}
                                         }
                                     } catch (e: Exception) {
                                         Log.w("AvatarVideoPlayer", "TextureView surface attach error: ${e.message}")
@@ -316,7 +308,7 @@ fun AvatarVideoPlayer(
 
                                 override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
                                     try {
-                                        mediaPlayer?.setSurface(null)
+                                        mediaPlayer.setSurface(null)
                                     } catch (e: Exception) {}
                                     return true
                                 }

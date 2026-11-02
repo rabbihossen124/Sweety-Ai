@@ -36,9 +36,13 @@ class ClapDetectorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
-        startClapListening()
+        try {
+            val notification = createNotification()
+            startForeground(NOTIFICATION_ID, notification)
+            startClapListening()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error starting ClapDetectorService: ${t.message}")
+        }
         return START_STICKY
     }
 
@@ -148,7 +152,7 @@ class ClapDetectorService : Service() {
             PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
             "SweetyAI:ClapWakeLock"
         )
-        wakeLock?.acquire(3000)
+        wakeLock?.acquire(3000L)
 
         // 3. Open MainActivity with voice listening activated
         val launchIntent = Intent(this, MainActivity::class.java).apply {
