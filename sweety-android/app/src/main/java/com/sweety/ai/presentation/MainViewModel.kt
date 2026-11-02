@@ -79,9 +79,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             onStateChange = { isListening ->
                 if (isListening && _state.value != AssistantState.SPEAKING && _state.value != AssistantState.THINKING) {
                     _state.value = AssistantState.LISTENING
+                } else if (!isListening && _state.value == AssistantState.LISTENING) {
+                    _state.value = AssistantState.IDLE
+                }
+            },
+            onErrorNotice = { notice ->
+                if (_state.value == AssistantState.LISTENING) {
+                    _state.value = AssistantState.IDLE
                 }
             }
         )
+    }
+
+    fun testCuteVoice() {
+        val sample = "আসসালামু আলাইকুম রাব্বি স্যার! আমি আপনার মিষ্টি সুইটি, বলুন আমি আপনাকে কীভাবে সাহায্য করতে পারি?"
+        tts?.speak(sample)
     }
 
     fun setServerUrl(url: String) {
