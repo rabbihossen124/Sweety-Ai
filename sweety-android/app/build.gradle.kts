@@ -24,8 +24,8 @@ android {
             storePassword = "sweetyai_password"
             keyAlias = "sweety"
             keyPassword = "sweetyai_password"
-            v1SigningEnabled = true
-            v2SigningEnabled = true
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 

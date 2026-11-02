@@ -3,7 +3,6 @@ package com.sweety.ai.voice
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.speech.tts.Voice
 import android.util.Log
 import java.util.Locale
 
@@ -16,31 +15,29 @@ class MultilingualTextToSpeech(
     private var onSpeechDoneCallback: (() -> Unit)? = null
 
     // Cute voice customization parameters
-    var voicePitch: Float = 1.25f // 1.25f is the sweet, cute, youthful female companion pitch
+    var voicePitch: Float = 1.25f // Sweet, cute, youthful female pitch
     var voiceSpeed: Float = 1.04f // Lively, conversational pace
 
-    private val banglaBDLocale = Locale("bn", "BD")
-    private val banglaINLocale = Locale("bn", "IN")
+    private val banglaLocale = Locale("bn", "BD")
+    private val banglaIndiaLocale = Locale("bn", "IN")
     private val hindiLocale = Locale("hi", "IN")
     private val englishLocale = Locale.US
 
     init {
-        // Initialize with Google TTS engine if available for highest quality natural human voices
-        val preferredEngine = "com.google.android.tts"
-        tts = TextToSpeech(context, { status ->
+        tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isInitialized = true
                 tts?.setSpeechRate(voiceSpeed)
                 tts?.setPitch(voicePitch)
                 setupUtteranceListener()
-                pickBestFemaleVoiceForCurrentLocale()
-                Log.d(TAG, "TTS initialized with Cute Female Voice profile (${tts?.voice?.name})")
+                applyFemaleVoice(banglaLocale)
+                Log.d(TAG, "TTS initialized with Cute Female Voice profile")
                 onInitComplete(true)
             } else {
                 Log.e(TAG, "Failed to initialize TTS with code: $status")
                 onInitComplete(false)
             }
-        }, preferredEngine)
+        }
     }
 
     private fun setupUtteranceListener() {
@@ -72,19 +69,18 @@ class MultilingualTextToSpeech(
 
         this.onSpeechDoneCallback = onDone
 
-        // 1. Determine optimal locale
+        // 1. Determine target language
         val targetLocale = when {
-            containsBangla(text) -> selectBestBanglaLocale()
+            containsBangla(text) -> banglaLocale
             containsHindi(text) -> hindiLocale
             else -> englishLocale
         }
 
         val result = tts?.setLanguage(targetLocale)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.w(TAG, "Target locale $targetLocale not supported, attempting fallback")
-            // If Bangla BD is not downloaded, try Bangla India
-            if (targetLocale == banglaBDLocale) {
-                tts?.setLanguage(banglaINLocale)
+            // Fallback for Bengali
+            if (targetLocale == banglaLocale) {
+                tts?.setLanguage(banglaIndiaLocale)
             } else {
                 tts?.language = Locale.getDefault()
             }
@@ -95,50 +91,29 @@ class MultilingualTextToSpeech(
         tts?.setSpeechRate(voiceSpeed)
 
         // 3. Find and activate high-quality female voice
-        selectFemaleVoice(tts?.language ?: targetLocale)
+        applyFemaleVoice(targetLocale)
 
         val utteranceId = "sweety_${System.currentTimeMillis()}"
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
-    private fun selectBestBanglaLocale(): Locale {
-        // Test if Bangladesh locale data is available, else prefer India Bengali
-        val bdCheck = tts?.isLanguageAvailable(banglaBDLocale)
-        return if (bdCheck == TextToSpeech.LANG_AVAILABLE || bdCheck == TextToSpeech.LANG_COUNTRY_AVAILABLE) {
-            banglaBDLocale
-        } else {
-            banglaINLocale
-        }
-    }
-
-    private fun pickBestFemaleVoiceForCurrentLocale() {
-        val currentLoc = tts?.language ?: banglaBDLocale
-        selectFemaleVoice(currentLoc)
-    }
-
     /**
      * Finds and applies the sweetest natural female voice in Google TTS
      */
-    private fun selectFemaleVoice(locale: Locale) {
+    private fun applyFemaleVoice(targetLocale: Locale) {
         try {
             val voices = tts?.voices ?: return
-            val lang = locale.language.lowercase()
+            val targetLang = targetLocale.language.lowercase()
 
-            // Filter voices for this language
-            val langVoices = voices.filter { it.locale.language.lowercase() == lang }
-            if (langVoices.isEmpty()) return
+            val bestFemale = voices.firstOrNull { voice ->
+                val vLang = voice.locale?.language?.lowercase() ?: ""
+                if (vLang != targetLang) return@firstOrNull false
 
-            // Search priority:
-            // 1. Explicit female keywords or Google's known Bengali female codes: ban, bin, bid
-            // 2. Google US/English female codes: sfg, iom, tpd
-            // 3. Any voice containing "female" / "woman"
-            // 4. Must NOT contain "male", "bic", "man", "boy", "guy"
-            val femaleVoice = langVoices.firstOrNull { voice ->
                 val name = voice.name.lowercase()
-                val isExplicitMale = name.contains("male") || name.contains("-bic-") || name.contains("man") || name.contains("guy")
-                if (isExplicitMale) return@firstOrNull false
+                val isMale = name.contains("male") || name.contains("-bic-") || name.contains("man") || name.contains("guy")
+                if (isMale) return@firstOrNull false
 
-                val isCuteFemale = name.contains("female") ||
+                val isFemale = name.contains("female") ||
                         name.contains("woman") ||
                         name.contains("-fem-") ||
                         name.contains("-ban-") || // Google Bengali Female BD
@@ -147,18 +122,14 @@ class MultilingualTextToSpeech(
                         name.contains("-sfg-") || // Google US Female
                         name.contains("-iom-") || // Google US Female
                         name.contains("-hie-") || // Google Hindi Female
-                        name.contains("-hia-") || // Google Hindi Female
-                        voice.features?.any { it.contains("female", ignoreCase = true) } == true
+                        name.contains("-hia-")
 
-                isCuteFemale
-            } ?: langVoices.firstOrNull { voice ->
-                val name = voice.name.lowercase()
-                !name.contains("male") && !name.contains("-bic-")
+                isFemale
             }
 
-            if (femaleVoice != null) {
-                tts?.voice = femaleVoice
-                Log.d(TAG, "Selected Sweet Female Voice: ${femaleVoice.name}")
+            if (bestFemale != null) {
+                tts?.voice = bestFemale
+                Log.d(TAG, "Selected Sweet Female Voice: ${bestFemale.name}")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Voice selection notice: ${e.message}")
