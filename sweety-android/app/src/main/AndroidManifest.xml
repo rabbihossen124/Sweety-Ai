@@ -49,6 +49,10 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".sensor.ClapDetectorService"
+            android:exported="false" />
+
     </application>
 
 </manifest>

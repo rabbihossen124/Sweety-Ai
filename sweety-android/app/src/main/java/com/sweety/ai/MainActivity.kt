@@ -38,10 +38,26 @@ class MainActivity : ComponentActivity() {
         // Check and request runtime microphone permission
         checkAndRequestPermissions()
 
+        // Handle 2-clap launch trigger
+        handleClapTrigger(intent)
+
         setContent {
             SweetyAITheme {
                 MainScreen(viewModel = viewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleClapTrigger(intent)
+    }
+
+    private fun handleClapTrigger(intent: Intent?) {
+        val clapTriggered = intent?.getBooleanExtra(ClapDetectorService.EXTRA_CLAP_TRIGGERED, false) == true
+        if (clapTriggered) {
+            viewModel.toggleVoiceInput()
         }
     }
 

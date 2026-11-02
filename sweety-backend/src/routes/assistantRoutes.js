@@ -94,10 +94,14 @@ router.get("/tts", async (req, res) => {
     }
   }
 
-  // 2. Natural Bengali / Hindi Neural Voice engine
+  // 2. Natural Bengali / Hindi Neural Voice engine (matches Audio 1 & Audio 2)
   try {
+    const isBangla = /[\u0980-\u09FF]/.test(cleanText);
+    const isHindi = /[\u0900-\u097F]/.test(cleanText);
+    const targetLang = isBangla ? "bn" : isHindi ? "hi" : (lang || "bn");
+
     const encoded = encodeURIComponent(cleanText);
-    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${lang}&client=tw-ob&q=${encoded}`;
+    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${targetLang}&client=tw-ob&q=${encoded}`;
     const ttsRes = await fetch(googleTtsUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

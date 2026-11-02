@@ -18,10 +18,15 @@ class CommandDispatcher(
 
         // 0. Wake Word & Friendly Greeting
         if (clean == "hey sweety" || clean == "hi sweety" || clean == "sweety" ||
+            clean == "hey sweetie" || clean == "hi sweetie" || clean == "sweetie" ||
             clean == "হাই সুইটি" || clean == "হ্যালো সুইটি" || clean == "হেই সুইটি" ||
-            clean.startsWith("hey sweety") || clean.startsWith("hi sweety")
+            clean == "সুইটি" || clean == "এই সুইটি" || clean == "সুইটি শোনো" || clean == "সুইটি আছো" ||
+            clean.startsWith("hey sweety") || clean.startsWith("hi sweety") ||
+            clean.startsWith("hey sweetie") || clean.startsWith("hi sweetie") ||
+            clean.startsWith("হাই সুইটি") || clean.startsWith("হেই সুইটি") ||
+            clean.startsWith("হ্যালো সুইটি") || clean.startsWith("সুইটি ")
         ) {
-            val greeting = GreetingHelper.generateWelcomeGreeting("রাব্বি স্যার")
+            val greeting = "জি রাব্বি স্যার! বলুন আমি শুনছি, আপনার জন্য কী কাজ করতে হবে?"
             return Pair(true, greeting)
         }
 
