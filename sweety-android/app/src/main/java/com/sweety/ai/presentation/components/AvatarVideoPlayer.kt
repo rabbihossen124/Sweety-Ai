@@ -90,10 +90,15 @@ fun AvatarVideoPlayer(
     )
 
     var videoViewRef by remember { mutableStateOf<VideoView?>(null) }
+    var isVideoPrepared by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
-        if (isActive) {
-            videoViewRef?.start()
+        if (isActive && isVideoPrepared) {
+            try {
+                videoViewRef?.start()
+            } catch (e: Exception) {
+                // Ignore any transient video start errors
+            }
         }
     }
 
@@ -151,10 +156,15 @@ fun AvatarVideoPlayer(
                         VideoView(ctx).apply {
                             setVideoURI(videoUri)
                             setOnPreparedListener { mp ->
+                                isVideoPrepared = true
                                 mp.isLooping = true
                                 // Mute video internal audio so Sweety's cute TTS voice speaks clearly
                                 mp.setVolume(0f, 0f)
-                                start()
+                                try {
+                                    start()
+                                } catch (e: Exception) {
+                                    // Safe fallback
+                                }
                             }
                             setOnErrorListener { _, _, _ ->
                                 true

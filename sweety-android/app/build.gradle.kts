@@ -12,8 +12,8 @@ android {
         applicationId = "com.sweety.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,8 +24,8 @@ android {
             storePassword = "sweetyai_password"
             keyAlias = "sweety"
             keyPassword = "sweetyai_password"
-            enableV1Signing = true
-            enableV2Signing = true
+            v1SigningEnabled = true
+            v2SigningEnabled = true
         }
     }
 

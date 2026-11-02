@@ -155,7 +155,7 @@ class ContinuousSpeechRecognizer(
                         // Auto: default to Bengali Bangladesh with Hindi and English support
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                        putExtra(RecognizerIntent.EXTRA_ADDITIONAL_LANGUAGES, arrayOf("en-US", "hi-IN", "bn-IN"))
+                        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US", "hi-IN", "bn-IN"))
                     }
                 }
             }

@@ -32,10 +32,7 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
-        if (recordAudioGranted) {
-            startClapService()
-        }
+        // Permissions granted
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,17 +88,6 @@ class MainActivity : ComponentActivity() {
 
         if (missingPermissions.isNotEmpty()) {
             permissionLauncher.launch(missingPermissions.toTypedArray())
-        } else {
-            startClapService()
-        }
-    }
-
-    private fun startClapService() {
-        val serviceIntent = Intent(this, ClapDetectorService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
         }
     }
 }
