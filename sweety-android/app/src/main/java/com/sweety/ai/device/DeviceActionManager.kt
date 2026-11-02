@@ -91,7 +91,7 @@ class DeviceActionManager(private val context: Context) {
     }
 
     /**
-     * Makes a phone call directly or opens dialer
+     * Opens phone dialer with number ready to call (no dangerous CALL_PHONE permission required)
      */
     fun makeCall(contactName: String, phoneNumber: String? = null): Pair<Boolean, String> {
         var targetNumber = phoneNumber
@@ -105,14 +105,6 @@ class DeviceActionManager(private val context: Context) {
         }
 
         return try {
-            val callIntent = Intent(Intent.ACTION_CALL).apply {
-                data = Uri.parse("tel:$targetNumber")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(callIntent)
-            Pair(true, "$contactName কে কল দেওয়া হচ্ছে...")
-        } catch (e: SecurityException) {
-            // If CALL_PHONE permission not granted, fallback safely to ACTION_DIAL (never crash!)
             val dialIntent = Intent(Intent.ACTION_DIAL).apply {
                 data = Uri.parse("tel:$targetNumber")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -120,12 +112,12 @@ class DeviceActionManager(private val context: Context) {
             context.startActivity(dialIntent)
             Pair(true, "$contactName এর নাম্বার ডায়ালারে ওপেন করা হয়েছে।")
         } catch (e: Exception) {
-            Pair(false, "কল করা সম্ভব হয়নি: ${e.localizedMessage}")
+            Pair(false, "ডায়াল করা সম্ভব হয়নি: ${e.localizedMessage}")
         }
     }
 
     /**
-     * Sends an SMS message to a contact
+     * Opens SMS app with contact and message pre-filled (no dangerous SEND_SMS permission required)
      */
     fun sendSms(contactName: String, message: String): Pair<Boolean, String> {
         val number = findPhoneNumberByContact(contactName)
@@ -134,20 +126,15 @@ class DeviceActionManager(private val context: Context) {
         }
 
         return try {
-            val smsManager = SmsManager.getDefault()
-            smsManager.sendTextMessage(number, null, message, null, null)
-            Pair(true, "$contactName কে মেসেজ পাঠিয়ে দেওয়া হয়েছে: \"$message\"")
-        } catch (e: SecurityException) {
-            // Fallback to SMS Intent
-            val sendIntent = Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse("sms:$number")
+            val sendIntent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("smsto:$number")
                 putExtra("sms_body", message)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(sendIntent)
-            Pair(true, "মেসেজ পাঠানোর স্ক্রিন ওপেন করা হয়েছে।")
+            Pair(true, "$contactName এর জন্য মেসেজ প্রস্তুত করা হয়েছে।")
         } catch (e: Exception) {
-            Pair(false, "মেসেজ পাঠানো যায়নি: ${e.localizedMessage}")
+            Pair(false, "মেসেজ ওপেন করা যায়নি: ${e.localizedMessage}")
         }
     }
 
