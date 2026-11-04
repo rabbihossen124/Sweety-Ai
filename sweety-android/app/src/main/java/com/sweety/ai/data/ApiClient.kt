@@ -1,5 +1,6 @@
 package com.sweety.ai.data
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -11,8 +12,12 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class ApiClient(
-    private var baseUrl: String = "https://sweety-ai-three.vercel.app"
+    private val context: Context? = null,
+    defaultUrl: String = "https://sweety-ai-three.vercel.app"
 ) {
+    private val prefs = context?.getSharedPreferences("sweety_prefs", Context.MODE_PRIVATE)
+    private var baseUrl: String = prefs?.getString("server_url", defaultUrl) ?: defaultUrl
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -22,7 +27,9 @@ class ApiClient(
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     fun setBaseUrl(newUrl: String) {
-        baseUrl = if (newUrl.endsWith("/")) newUrl.dropLast(1) else newUrl
+        val cleanUrl = if (newUrl.endsWith("/")) newUrl.dropLast(1) else newUrl
+        baseUrl = cleanUrl
+        prefs?.edit()?.putString("server_url", cleanUrl)?.apply()
     }
 
     fun getBaseUrl(): String = baseUrl

@@ -171,6 +171,79 @@ export const deviceTools = [
   },
   {
     type: "function",
+    name: "play_youtube",
+    description: "Searches and plays a song, music video, or query directly on YouTube.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Song title, artist, or video search query (e.g., 'Arijit Singh romantic songs', 'Believer Imagine Dragons').",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    type: "function",
+    name: "toggle_wifi",
+    description: "Turns Wi-Fi on or off, or launches the quick Wi-Fi control panel.",
+    parameters: {
+      type: "object",
+      properties: {
+        state: {
+          type: "boolean",
+          description: "true to enable Wi-Fi, false to disable Wi-Fi.",
+        },
+      },
+      required: ["state"],
+    },
+  },
+  {
+    type: "function",
+    name: "toggle_bluetooth",
+    description: "Turns Bluetooth on or off, or opens the Bluetooth control panel.",
+    parameters: {
+      type: "object",
+      properties: {
+        state: {
+          type: "boolean",
+          description: "true to enable Bluetooth, false to disable Bluetooth.",
+        },
+      },
+      required: ["state"],
+    },
+  },
+  {
+    type: "function",
+    name: "open_data_settings",
+    description: "Opens mobile cellular data connection panel or network settings.",
+    parameters: {
+      type: "object",
+      properties: {
+        state: {
+          type: "boolean",
+          description: "true to turn data ON, false to turn data OFF.",
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    name: "close_app",
+    description: "Closes the active app or returns immediately to the Android home screen.",
+    parameters: {
+      type: "object",
+      properties: {
+        app_name: {
+          type: "string",
+          description: "Optional name of the app to close.",
+        },
+      },
+    },
+  },
+  {
+    type: "function",
     name: "save_memory",
     description: "Saves a persistent fact or preference about the user to memory for future recall.",
     parameters: {

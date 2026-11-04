@@ -38,3 +38,10 @@ data class PendingConfirmation(
     val onCancel: () -> Unit
 )
 
+data class ChatSession(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val lastMessage: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+

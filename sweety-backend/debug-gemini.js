@@ -8,7 +8,7 @@ async function runDebug() {
   console.time("Gemini Call");
   try {
     const res = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.5-flash",
       contents: "Hello Sweety! Say 'I am online and ready to assist Rabbi!' in Bengali."
     });
     console.timeEnd("Gemini Call");

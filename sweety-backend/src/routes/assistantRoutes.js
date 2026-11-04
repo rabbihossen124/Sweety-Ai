@@ -94,11 +94,11 @@ router.get("/tts", async (req, res) => {
     }
   }
 
-  // 2. Natural Bengali / Hindi Neural Voice engine (matches Audio 1 & Audio 2)
+  // Strict 3-Voice Engine (Locked ONLY to Rabbi Sir's 3 provided voices: Bengali, Hindi, and English Kore)
   try {
     const isBangla = /[\u0980-\u09FF]/.test(cleanText);
     const isHindi = /[\u0900-\u097F]/.test(cleanText);
-    const targetLang = isBangla ? "bn" : isHindi ? "hi" : (lang || "bn");
+    const targetLang = isBangla ? "bn" : isHindi ? "hi" : "en";
 
     const encoded = encodeURIComponent(cleanText);
     const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${targetLang}&client=tw-ob&q=${encoded}`;

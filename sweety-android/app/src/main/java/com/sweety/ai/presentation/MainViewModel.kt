@@ -10,6 +10,7 @@ import com.sweety.ai.data.ActionPayload
 import com.sweety.ai.data.ApiClient
 import com.sweety.ai.data.AssistantState
 import com.sweety.ai.data.ChatMessage
+import com.sweety.ai.data.ChatSession
 import com.sweety.ai.data.PendingConfirmation
 import com.sweety.ai.device.DeviceActionManager
 import com.sweety.ai.domain.CommandDispatcher
@@ -25,7 +26,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context: Context get() = getApplication()
 
-    private val apiClient = ApiClient()
+    private val apiClient = ApiClient(context)
     val deviceManager = DeviceActionManager(context)
     private var tts: MultilingualTextToSpeech? = null
     private var stt: ContinuousSpeechRecognizer? = null
@@ -37,6 +38,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _audioRms = MutableStateFlow(0f)
     val audioRms: StateFlow<Float> = _audioRms.asStateFlow()
+
+    private val _currentSessionId = MutableStateFlow("session_default")
+    val currentSessionId: StateFlow<String> = _currentSessionId.asStateFlow()
+
+    private val _sessions = MutableStateFlow<List<ChatSession>>(
+        listOf(
+            ChatSession(
+                id = "session_default",
+                title = "সুইটি অ্যাসিস্ট্যান্ট (মূল আড্ডা)",
+                lastMessage = "আসসালামু আলাইকুম রাব্বি স্যার!",
+                timestamp = System.currentTimeMillis()
+            )
+        )
+    )
+    val sessions: StateFlow<List<ChatSession>> = _sessions.asStateFlow()
+
+    private val sessionMessages = mutableMapOf<String, List<ChatMessage>>()
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(
@@ -58,7 +76,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val countdownSeconds: StateFlow<Int> = _countdownSeconds.asStateFlow()
 
     private var followUpTimer: CountDownTimer? = null
-    private var sessionId: String = "session_${System.currentTimeMillis()}"
+    private var sessionId: String = "session_default"
 
     init {
         try {
@@ -106,6 +124,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         tts?.speak(sample)
     }
 
+    fun onClapWakeUp() {
+        viewModelScope.launch(Dispatchers.Main) {
+            cancelFollowUpTimer()
+            tts?.stop()
+            val wakeGreeting = "জি রাব্বি স্যার! সুইটি শুনছি, বলুন কী করতে হবে?"
+            val assistantMsg = ChatMessage(text = wakeGreeting, isUser = false)
+            _messages.value = _messages.value + assistantMsg
+
+            _state.value = AssistantState.SPEAKING
+            tts?.speak(wakeGreeting) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    _state.value = AssistantState.LISTENING
+                    stt?.startListening()
+                }
+            }
+        }
+    }
+
+    private fun containsOtherAssistant(text: String): Boolean {
+        val lower = text.lowercase().trim()
+        val otherAssistants = listOf(
+            "alexa", "অ্যালেক্সা", "aleksa",
+            "siri", "সিরি",
+            "google", "গুগল", "ok google", "hey google",
+            "bixby", "বিক্সবি",
+            "cortana", "কর্টানা",
+            "jarvis", "জার্ভিস"
+        )
+        return otherAssistants.any { lower.contains(it) }
+    }
+
     fun setServerUrl(url: String) {
         apiClient.setBaseUrl(url)
     }
@@ -140,29 +189,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun processUserPrompt(prompt: String, fromVoice: Boolean = false) {
         if (prompt.isBlank()) return
 
+        // 1. Other assistant name rejection:
+        // "mukdie sweety bole dakbo tokn res korbe ono name ba kasue bole dakle res korbe na"
+        if (fromVoice && containsOtherAssistant(prompt)) {
+            Log.w(TAG, "Ignoring prompt directed to another assistant: $prompt")
+            _state.value = AssistantState.IDLE
+            return
+        }
+
         cancelFollowUpTimer()
         try {
             stt?.stopListening()
         } catch (t: Throwable) {}
 
-        // 1. Add user message to chat UI
+        // 2. Add user message to chat UI
         val userMsg = ChatMessage(text = prompt, isUser = true)
         _messages.value = _messages.value + userMsg
 
-        // 2. Set thinking state
+        // Update active session snippet & title
+        val preview = if (prompt.length > 25) prompt.take(25) + "..." else prompt
+        _sessions.value = _sessions.value.map { sess ->
+            if (sess.id == _currentSessionId.value) {
+                val newTitle = if (sess.title.startsWith("কথোপকথন #") || sess.title.startsWith("সুইটি অ্যাসিস্ট্যান্ট")) preview else sess.title
+                sess.copy(title = newTitle, lastMessage = prompt, timestamp = System.currentTimeMillis())
+            } else sess
+        }
+
+        // 3. Set thinking state
         _state.value = AssistantState.THINKING
 
         viewModelScope.launch(Dispatchers.Main) {
             try {
-                // 3. Fast-path local intent matching (~10ms execution without waiting for backend)
+                // 4. Fast-path local intent matching (~10ms execution without waiting for backend)
                 val fastMatch = commandDispatcher.tryFastLocalIntent(prompt)
                 if (fastMatch.first && fastMatch.second != null) {
                     val feedback = fastMatch.second!!
-                    handleAssistantReply(feedback, actions = emptyList(), continueListening = fromVoice)
+                    handleAssistantReply(
+                        text = feedback,
+                        actions = emptyList(),
+                        continueListening = fromVoice,
+                        fromVoice = fromVoice
+                    )
                     return@launch
                 }
 
-                // 4. Send to Node.js / Gemini Backend
+                // 5. Send to Node.js / Gemini Backend
                 val response = apiClient.sendChatMessage(
                     message = prompt,
                     sessionId = sessionId
@@ -184,13 +255,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     handleAssistantReply(
                         text = response.text,
                         actions = executedActions,
-                        continueListening = if (fromVoice) response.continueListening else false
+                        continueListening = if (fromVoice) response.continueListening else false,
+                        fromVoice = fromVoice
                     )
                 } else {
                     handleAssistantReply(
                         text = response.text,
                         actions = emptyList(),
-                        continueListening = false
+                        continueListening = false,
+                        fromVoice = fromVoice
                     )
                 }
             } catch (e: Exception) {
@@ -198,7 +271,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 handleAssistantReply(
                     text = "দুঃখিত রাব্বি স্যার, একটি সমস্যা হয়েছে: ${e.localizedMessage ?: "সার্ভার এরর"}",
                     actions = emptyList(),
-                    continueListening = false
+                    continueListening = false,
+                    fromVoice = fromVoice
                 )
             }
         }
@@ -207,7 +281,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun handleAssistantReply(
         text: String,
         actions: List<ActionPayload>,
-        continueListening: Boolean
+        continueListening: Boolean,
+        fromVoice: Boolean = true
     ) {
         val assistantMsg = ChatMessage(
             text = text,
@@ -216,25 +291,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         _messages.value = _messages.value + assistantMsg
 
-        // Speak response via Multilingual TTS
-        _state.value = AssistantState.SPEAKING
-        try {
-            tts?.speak(text) {
-                // On speech done:
-                viewModelScope.launch(Dispatchers.Main) {
-                    try {
-                        if (continueListening) {
-                            startContinuousListeningWindow()
-                        } else {
+        if (fromVoice) {
+            // Speak response via Multilingual TTS
+            _state.value = AssistantState.SPEAKING
+            try {
+                tts?.speak(text) {
+                    // On speech done:
+                    viewModelScope.launch(Dispatchers.Main) {
+                        try {
+                            if (continueListening) {
+                                startContinuousListeningWindow()
+                            } else {
+                                _state.value = AssistantState.IDLE
+                            }
+                        } catch (t: Throwable) {
                             _state.value = AssistantState.IDLE
                         }
-                    } catch (t: Throwable) {
-                        _state.value = AssistantState.IDLE
                     }
                 }
+            } catch (t: Throwable) {
+                Log.e(TAG, "TTS speak error: ${t.message}")
+                _state.value = AssistantState.IDLE
             }
-        } catch (t: Throwable) {
-            Log.e(TAG, "TTS speak error: ${t.message}")
+        } else {
+            // Text chat mode: answered directly in chat
             _state.value = AssistantState.IDLE
         }
     }
@@ -288,28 +368,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startNewChat() {
+        createNewSession()
+    }
+
+    fun switchSession(newSessionId: String) {
+        if (newSessionId == _currentSessionId.value) return
         cancelFollowUpTimer()
-        try {
-            stt?.stopListening()
-        } catch (t: Throwable) {}
+        try { stt?.stopListening() } catch (t: Throwable) {}
+
+        sessionMessages[_currentSessionId.value] = _messages.value
+        _currentSessionId.value = newSessionId
+        sessionId = newSessionId
+
+        val existing = sessionMessages[newSessionId]
+        if (existing != null) {
+            _messages.value = existing
+        } else {
+            val greeting = com.sweety.ai.domain.GreetingHelper.generateWelcomeGreeting("রাব্বি স্যার")
+            _messages.value = listOf(ChatMessage(text = greeting, isUser = false))
+        }
+    }
+
+    fun createNewSession() {
+        cancelFollowUpTimer()
+        try { stt?.stopListening() } catch (t: Throwable) {}
+
+        sessionMessages[_currentSessionId.value] = _messages.value
+        val newId = "session_${System.currentTimeMillis()}"
+        val newSession = ChatSession(
+            id = newId,
+            title = "কথোপকথন #${_sessions.value.size + 1}",
+            lastMessage = "নতুন চ্যাট শুরু হয়েছে",
+            timestamp = System.currentTimeMillis()
+        )
+        _sessions.value = listOf(newSession) + _sessions.value
+        _currentSessionId.value = newId
+        sessionId = newId
 
         val greeting = com.sweety.ai.domain.GreetingHelper.generateWelcomeGreeting("রাব্বি স্যার")
-        _messages.value = listOf(
-            ChatMessage(
-                text = greeting,
-                isUser = false
+        _messages.value = listOf(ChatMessage(text = greeting, isUser = false))
+    }
+
+    fun deleteSession(targetSessionId: String) {
+        if (_sessions.value.size <= 1) return
+        val wasCurrent = targetSessionId == _currentSessionId.value
+        _sessions.value = _sessions.value.filter { it.id != targetSessionId }
+        sessionMessages.remove(targetSessionId)
+        if (wasCurrent) {
+            val next = _sessions.value.first()
+            _currentSessionId.value = next.id
+            sessionId = next.id
+            _messages.value = sessionMessages[next.id] ?: listOf(
+                ChatMessage(text = com.sweety.ai.domain.GreetingHelper.generateWelcomeGreeting("রাব্বি স্যার"), isUser = false)
             )
-        )
-        sessionId = "session_${System.currentTimeMillis()}"
-        _state.value = AssistantState.SPEAKING
-        try {
-            tts?.speak(greeting) {
-                viewModelScope.launch(Dispatchers.Main) {
-                    _state.value = AssistantState.IDLE
-                }
-            }
-        } catch (t: Throwable) {
-            _state.value = AssistantState.IDLE
         }
     }
 

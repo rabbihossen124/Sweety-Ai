@@ -20,14 +20,19 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
-    private val requiredPermissions = listOf(
-        Manifest.permission.RECORD_AUDIO
-    )
+    private val requiredPermissions = buildList {
+        add(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // Permissions granted
+        if (permissions[Manifest.permission.RECORD_AUDIO] == true) {
+            startClapDetectorService()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,8 +41,11 @@ class MainActivity : ComponentActivity() {
         // Enable display and wake-up over lock screen
         setupLockScreenVisibility()
 
-        // Check and request runtime microphone permission
+        // Check and request runtime microphone and notification permissions
         checkAndRequestPermissions()
+
+        // Start 2-clap background listener if permission is already granted
+        startClapDetectorService()
 
         // Handle 2-clap launch trigger
         handleClapTrigger(intent)
@@ -58,7 +66,18 @@ class MainActivity : ComponentActivity() {
     private fun handleClapTrigger(intent: Intent?) {
         val clapTriggered = intent?.getBooleanExtra(ClapDetectorService.EXTRA_CLAP_TRIGGERED, false) == true
         if (clapTriggered) {
-            viewModel.toggleVoiceInput()
+            viewModel.onClapWakeUp()
+        }
+    }
+
+    private fun startClapDetectorService() {
+        try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                val serviceIntent = Intent(this, ClapDetectorService::class.java)
+                ContextCompat.startForegroundService(this, serviceIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to start ClapDetectorService: ${e.message}")
         }
     }
 

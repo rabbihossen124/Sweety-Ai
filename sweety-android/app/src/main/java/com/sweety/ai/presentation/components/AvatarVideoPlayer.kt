@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -68,7 +69,9 @@ import com.sweety.ai.presentation.theme.Typography
 fun AvatarVideoPlayer(
     state: AssistantState,
     onAvatarClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sizeDp: Dp = 100.dp,
+    showStatusPill: Boolean = true
 ) {
     val context = LocalContext.current
     val isSpeaking = state == AssistantState.SPEAKING
@@ -194,7 +197,7 @@ fun AvatarVideoPlayer(
     ) {
         Box(
             modifier = Modifier
-                .size(150.dp)
+                .size(sizeDp)
                 .scale(avatarScale * breathingPulse)
                 .clickable { onAvatarClick() },
             contentAlignment = Alignment.Center
@@ -202,7 +205,7 @@ fun AvatarVideoPlayer(
             // 1. Outermost Glowing Radial Energy Field
             Box(
                 modifier = Modifier
-                    .size(145.dp)
+                    .size(sizeDp * 0.96f)
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
@@ -218,7 +221,7 @@ fun AvatarVideoPlayer(
             // 2. Futuristic Cybernetic Rotating Orbit Ring
             Box(
                 modifier = Modifier
-                    .size(132.dp)
+                    .size(sizeDp * 0.88f)
                     .rotate(orbitRotation)
                     .clip(CircleShape)
                     .border(
@@ -239,7 +242,7 @@ fun AvatarVideoPlayer(
             // 3. Counter-rotating Accent Ring
             Box(
                 modifier = Modifier
-                    .size(122.dp)
+                    .size(sizeDp * 0.80f)
                     .rotate(-orbitRotation * 1.5f)
                     .clip(CircleShape)
                     .border(
@@ -259,7 +262,7 @@ fun AvatarVideoPlayer(
             // 4. Central Live Video & Hologram Portrait Container
             Box(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(sizeDp * 0.72f)
                     .clip(CircleShape)
                     .background(DarkVoid)
                     .border(
@@ -341,39 +344,41 @@ fun AvatarVideoPlayer(
         }
 
         // Live Dynamic Status Pill
-        Spacer(modifier = Modifier.height(10.dp))
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(primaryColor.copy(alpha = 0.18f))
-                .border(
-                    width = 1.dp,
-                    color = primaryColor.copy(alpha = 0.65f),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .padding(horizontal = 14.dp, vertical = 5.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(primaryColor)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = when {
-                        isSpeaking -> "🔊 সুইটি কথা বলছে..."
-                        isListening -> "🎙️ সুইটি শুনছি, বলুন রাব্বি স্যার..."
-                        isThinking -> "🧠 ভাবছি..."
-                        else -> "✨ Sweety AI Online"
-                    },
-                    style = Typography.labelSmall.copy(
-                        color = Color.White,
-                        fontSize = 11.sp
+        if (showStatusPill) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(primaryColor.copy(alpha = 0.18f))
+                    .border(
+                        width = 1.dp,
+                        color = primaryColor.copy(alpha = 0.65f),
+                        shape = RoundedCornerShape(16.dp)
                     )
-                )
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(primaryColor)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = when {
+                            isSpeaking -> "🔊 সুইটি কথা বলছে..."
+                            isListening -> "🎙️ সুইটি শুনছি, বলুন রাব্বি স্যার..."
+                            isThinking -> "🧠 ভাবছি..."
+                            else -> "✨ Sweety AI Online (ট্যাপ করে বলুন)"
+                        },
+                        style = Typography.labelSmall.copy(
+                            color = Color.White,
+                            fontSize = 11.sp
+                        )
+                    )
+                }
             }
         }
     }

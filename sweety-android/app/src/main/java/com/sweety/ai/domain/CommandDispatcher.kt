@@ -61,6 +61,55 @@ class CommandDispatcher(
             return Pair(true, res.second)
         }
 
+        // 4. Wi-Fi control
+        if (clean.contains("wifi on") || clean.contains("ওয়াইফাই অন") || clean.contains("ওয়াইফাই অন") || clean.contains("wifi chalu")) {
+            val res = deviceManager.toggleWifi(true)
+            return Pair(true, res.second)
+        }
+        if (clean.contains("wifi off") || clean.contains("ওয়াইফাই অফ") || clean.contains("ওয়াইফাই অফ") || clean.contains("ওয়াইফাই ক্লোজ") || clean.contains("wifi bandho")) {
+            val res = deviceManager.toggleWifi(false)
+            return Pair(true, res.second)
+        }
+
+        // 5. Bluetooth control
+        if (clean.contains("bluetooth on") || clean.contains("ব্লুটুথ অন") || clean.contains("bluetooth chalu")) {
+            val res = deviceManager.toggleBluetooth(true)
+            return Pair(true, res.second)
+        }
+        if (clean.contains("bluetooth off") || clean.contains("ব্লুটুথ অফ") || clean.contains("bluetooth bandho")) {
+            val res = deviceManager.toggleBluetooth(false)
+            return Pair(true, res.second)
+        }
+
+        // 6. Mobile Data panel
+        if (clean.contains("data on") || clean.contains("mobile data") || clean.contains("ডাটা অন") || clean.contains("মোবাইল ডাটা") || clean.contains("নেট অন")) {
+            val res = deviceManager.openMobileDataSettings()
+            return Pair(true, res.second)
+        }
+
+        // 7. Close App / Go Home
+        if (clean.contains("close app") || clean.contains("অ্যাপ বন্ধ") || clean.contains("অ্যাপ ক্লোজ") || clean.contains("হোমে যাও") || clean.contains("go home")) {
+            val res = deviceManager.closeCurrentApp()
+            return Pair(true, res.second)
+        }
+
+        // 8. YouTube Quick Song/Music search
+        if (clean.startsWith("play ") || clean.contains("গান চালাও") || clean.contains("গান বাজাও") || clean.contains("ইউটিউবে")) {
+            var songQuery = clean
+                .replace("play", "")
+                .replace("on youtube", "")
+                .replace("in youtube", "")
+                .replace("ইউটিউবে", "")
+                .replace("গান চালাও", "")
+                .replace("গান বাজাও", "")
+                .replace("চালিয়ে দাও", "")
+                .replace("গান", "")
+                .trim()
+            if (songQuery.isBlank()) songQuery = "Bangla new songs"
+            val res = deviceManager.playYouTube(songQuery)
+            return Pair(true, res.second)
+        }
+
         return Pair(false, null)
     }
 
@@ -158,6 +207,40 @@ class CommandDispatcher(
 
             "lock_device" -> {
                 val res = deviceManager.lockDevice()
+                onComplete(res.first, res.second)
+            }
+
+            "play_youtube" -> {
+                val query = action.params["query"] as? String ?: "Bangla songs"
+                val res = deviceManager.playYouTube(query)
+                onComplete(res.first, res.second)
+            }
+
+            "toggle_wifi" -> {
+                val state = action.params["state"] as? Boolean ?: true
+                val res = deviceManager.toggleWifi(state)
+                onComplete(res.first, res.second)
+            }
+
+            "toggle_bluetooth" -> {
+                val state = action.params["state"] as? Boolean ?: true
+                val res = deviceManager.toggleBluetooth(state)
+                onComplete(res.first, res.second)
+            }
+
+            "open_data_settings" -> {
+                val res = deviceManager.openMobileDataSettings()
+                onComplete(res.first, res.second)
+            }
+
+            "close_app" -> {
+                val res = deviceManager.closeCurrentApp()
+                onComplete(res.first, res.second)
+            }
+
+            "share_file" -> {
+                val mime = action.params["mime_type"] as? String ?: "*/*"
+                val res = deviceManager.shareFile(mime)
                 onComplete(res.first, res.second)
             }
 

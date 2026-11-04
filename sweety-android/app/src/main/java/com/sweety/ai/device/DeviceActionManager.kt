@@ -212,6 +212,144 @@ class DeviceActionManager(private val context: Context) {
         return Pair(true, "ফোন লক করতে পাওয়ার বাটনে প্রেস করুন।")
     }
 
+    /**
+     * Searches and plays a song or video directly on YouTube
+     */
+    fun playYouTube(query: String): Pair<Boolean, String> {
+        return try {
+            val cleanQuery = query.trim()
+            val uri = Uri.parse("https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode(cleanQuery, "UTF-8"))
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage("com.google.android.youtube")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(intent)
+                Pair(true, "ইউটিউবে \"$cleanQuery\" প্লে করছি।")
+            } catch (e: Exception) {
+                val browserIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(browserIntent)
+                Pair(true, "ব্রাউজারে ইউটিউবে \"$cleanQuery\" প্লে করছি।")
+            }
+        } catch (e: Exception) {
+            Pair(false, "ইউটিউব ওপেন করা যায়নি: ${e.localizedMessage}")
+        }
+    }
+
+    /**
+     * Closes the active app and returns to Android home screen
+     */
+    fun closeCurrentApp(): Pair<Boolean, String> {
+        return try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(homeIntent)
+            Pair(true, "হোম স্ক্রিনে ফিরে যাচ্ছি এবং অ্যাপ ক্লোজ করছি।")
+        } catch (e: Exception) {
+            Pair(false, "হোমে যাওয়া সম্ভব হয়নি: ${e.localizedMessage}")
+        }
+    }
+
+    /**
+     * Controls or launches Wi-Fi control panel
+     */
+    fun toggleWifi(state: Boolean): Pair<Boolean, String> {
+        val status = if (state) "অন" else "অফ"
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val panelIntent = Intent(android.provider.Settings.Panel.ACTION_WIFI).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(panelIntent)
+                Pair(true, "ওয়াইফাই $status করার প্যানেল ওপেন করেছি।")
+            } else {
+                @Suppress("DEPRECATION")
+                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                @Suppress("DEPRECATION")
+                wifiManager?.isWifiEnabled = state
+                Pair(true, "ওয়াইফাই $status করা হয়েছে।")
+            }
+        } catch (e: Exception) {
+            try {
+                val settingsIntent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(settingsIntent)
+                Pair(true, "ওয়াইফাই সেটিংস ওপেন করেছি।")
+            } catch (ex: Exception) {
+                Pair(false, "ওয়াইফাই পরিবর্তন করা যায়নি: ${ex.localizedMessage}")
+            }
+        }
+    }
+
+    /**
+     * Controls or opens Bluetooth control settings
+     */
+    fun toggleBluetooth(state: Boolean): Pair<Boolean, String> {
+        val status = if (state) "অন" else "অফ"
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                val intent = Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                Pair(true, "ব্লুটুথ $status করার সেটিংস ওপেন করেছি।")
+            } else {
+                @Suppress("DEPRECATION")
+                val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+                @Suppress("DEPRECATION")
+                if (state) adapter?.enable() else adapter?.disable()
+                Pair(true, "ব্লুটুথ $status করা হয়েছে।")
+            }
+        } catch (e: Exception) {
+            Pair(false, "ব্লুটুথ কন্ট্রোল করা যায়নি: ${e.localizedMessage}")
+        }
+    }
+
+    /**
+     * Opens Cellular / Mobile data settings panel
+     */
+    fun openMobileDataSettings(): Pair<Boolean, String> {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val intent = Intent(android.provider.Settings.Panel.ACTION_INTERNET).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                Pair(true, "মোবাইল ডাটা ও ইন্টারনেট প্যানেল ওপেন করেছি।")
+            } else {
+                val intent = Intent(android.provider.Settings.ACTION_DATA_ROAMING_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                Pair(true, "মোবাইল ডাটা সেটিংস ওপেন করেছি।")
+            }
+        } catch (e: Exception) {
+            Pair(false, "ডাটা সেটিংস ওপেন করা যায়নি: ${e.localizedMessage}")
+        }
+    }
+
+    /**
+     * Opens storage file manager / file picker to share files, audio, video
+     */
+    fun shareFile(mimeType: String = "*/*"): Pair<Boolean, String> {
+        return try {
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = mimeType
+                addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Pair(true, "ফাইল নির্বাচন করার জন্য স্টোরেজ ওপেন করেছি।")
+        } catch (e: Exception) {
+            Pair(false, "ফাইল স্টোরেজ ওপেন করা যায়নি: ${e.localizedMessage}")
+        }
+    }
+
     companion object {
         private const val TAG = "DeviceActionManager"
     }
