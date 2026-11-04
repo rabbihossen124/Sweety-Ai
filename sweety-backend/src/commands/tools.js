@@ -5,17 +5,17 @@ export const deviceTools = [
   {
     type: "function",
     name: "open_app",
-    description: "Opens an installed application on the user's Android phone.",
+    description: "Opens an installed application on the user's Android phone (e.g. WhatsApp, Facebook, Chrome, Camera, Settings). NOTE: If the user asks to play a song, video, or music, do NOT use this; use play_youtube instead.",
     parameters: {
       type: "object",
       properties: {
         app_name: {
           type: "string",
-          description: "Name of the app to launch (e.g., 'WhatsApp', 'YouTube', 'Camera', 'Gallery', 'Facebook', 'Chrome', 'Settings').",
+          description: "Name of the app to launch (e.g., 'WhatsApp', 'Camera', 'Gallery', 'Facebook', 'Chrome', 'Settings').",
         },
         package_name: {
           type: "string",
-          description: "Optional package name if known (e.g. 'com.whatsapp', 'com.google.android.youtube').",
+          description: "Optional package name if known (e.g. 'com.whatsapp', 'com.android.chrome').",
         },
       },
       required: ["app_name"],
@@ -172,13 +172,13 @@ export const deviceTools = [
   {
     type: "function",
     name: "play_youtube",
-    description: "Searches and plays a song, music video, or query directly on YouTube.",
+    description: "Searches and plays a song, music, track, or video directly on YouTube. ALWAYS call this function whenever the user asks to play music, play a song, or search a track (e.g. 'গান চালাও', 'গান বাজাও', 'গান শোনাও', 'play song', 'play music on youtube').",
     parameters: {
       type: "object",
       properties: {
         query: {
           type: "string",
-          description: "Song title, artist, or video search query (e.g., 'Arijit Singh romantic songs', 'Believer Imagine Dragons').",
+          description: "Song title, artist name, or music search query (e.g., 'Arijit Singh romantic songs', 'Believer Imagine Dragons', 'Bangla romantic song').",
         },
       },
       required: ["query"],

@@ -89,18 +89,22 @@ class ContinuousSpeechRecognizer(
                             when (error) {
                                 SpeechRecognizer.ERROR_NO_MATCH,
                                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                                    onErrorNotice("কিছু শুনতে পাইনি রাব্বি স্যার, আবার বলুন!")
+                                    onErrorNotice("কিছু শুনতে পাইনি স্যার, আবার বলুন!")
                                 }
                                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
-                                    onErrorNotice("মাইক্রোফোন পারমিশন প্রয়োজন!")
+                                    onErrorNotice("মাইক্রোফোন পারমিশন অন করুন!")
                                 }
                                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
-                                SpeechRecognizer.ERROR_CLIENT -> {
+                                SpeechRecognizer.ERROR_CLIENT,
+                                SpeechRecognizer.ERROR_AUDIO -> {
                                     try {
                                         speechRecognizer?.cancel()
+                                        speechRecognizer?.destroy()
                                     } catch (t: Throwable) {}
+                                    speechRecognizer = null
                                 }
                             }
+                            com.sweety.ai.sensor.ClapDetectorService.resumeListening()
                         } catch (t: Throwable) {
                             Log.e(TAG, "onError callback exception: ${t.message}")
                         }
@@ -115,6 +119,7 @@ class ContinuousSpeechRecognizer(
                             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             val spokenText = matches?.firstOrNull() ?: ""
                             Log.d(TAG, "Recognized Speech: $spokenText")
+                            com.sweety.ai.sensor.ClapDetectorService.resumeListening()
                             if (spokenText.isNotBlank()) {
                                 onResult(spokenText)
                             }
@@ -159,12 +164,16 @@ class ContinuousSpeechRecognizer(
             return
         }
 
+        // Release hardware mic from background clap detector
+        com.sweety.ai.sensor.ClapDetectorService.pauseListening()
+
         mainHandler.post {
             try {
                 if (!ensureRecognizerReady()) {
                     onErrorNotice("মাইক্রোফোন চালু করা যায়নি!")
                     isListening = false
                     onStateChange(false)
+                    com.sweety.ai.sensor.ClapDetectorService.resumeListening()
                     return@post
                 }
 
@@ -225,6 +234,7 @@ class ContinuousSpeechRecognizer(
             }
             isListening = false
             onStateChange(false)
+            com.sweety.ai.sensor.ClapDetectorService.resumeListening()
         }
     }
 

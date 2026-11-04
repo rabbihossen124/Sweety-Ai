@@ -1,5 +1,8 @@
 package com.sweety.ai.presentation
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -113,6 +116,15 @@ fun MainScreen(viewModel: MainViewModel) {
     val listState = rememberLazyListState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
+
+    // File Picker for standard Android file selection (images, video, audio, documents)
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.onFileSelected(uri)
+        }
+    }
 
     // Keyboard detection for adaptive UI
     val imeInsets = WindowInsets.ime
@@ -475,7 +487,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         viewModel.processUserPrompt("ডাটা অন")
                     })
                     ActionPill("📁 Share File", onClick = {
-                        viewModel.deviceManager.shareFile()
+                        filePickerLauncher.launch("*/*")
                     })
                     ActionPill("🔋 Battery", onClick = {
                         viewModel.processUserPrompt("Check battery level")
@@ -498,7 +510,10 @@ fun MainScreen(viewModel: MainViewModel) {
                     contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
                 ) {
                     items(messages, key = { it.id }) { msg ->
-                        ChatMessageBubble(message = msg)
+                        ChatMessageBubble(
+                            message = msg,
+                            onSpeakClick = { viewModel.speakMessage(it) }
+                        )
                     }
                 }
 
@@ -577,9 +592,9 @@ fun MainScreen(viewModel: MainViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 📎 File Attachment / Share Button (Audio, Video, Files)
+                        // 📎 File Attachment / Picker Button (Audio, Video, Files)
                         IconButton(
-                            onClick = { viewModel.deviceManager.shareFile() },
+                            onClick = { filePickerLauncher.launch("*/*") },
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)

@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +40,7 @@ import com.sweety.ai.presentation.theme.Typography
 @Composable
 fun ChatMessageBubble(
     message: ChatMessage,
+    onSpeakClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isUser = message.isUser
@@ -52,15 +55,31 @@ fun ChatMessageBubble(
             modifier = Modifier.fillMaxWidth(0.85f),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            // Sender tag
-            Text(
-                text = if (isUser) "YOU" else "SWEETY AI",
-                style = Typography.labelSmall.copy(
-                    color = if (isUser) NeonBlue else ElectricCyan,
-                    fontSize = 10.sp
-                ),
+            // Sender tag + Speaker replay button for Sweety
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 2.dp, start = 4.dp, end = 4.dp)
-            )
+            ) {
+                Text(
+                    text = if (isUser) "YOU" else "SWEETY AI",
+                    style = Typography.labelSmall.copy(
+                        color = if (isUser) NeonBlue else ElectricCyan,
+                        fontSize = 10.sp
+                    )
+                )
+
+                if (!isUser && onSpeakClick != null) {
+                    Icon(
+                        imageVector = Icons.Filled.VolumeUp,
+                        contentDescription = "Speak",
+                        tint = ElectricCyan.copy(alpha = 0.8f),
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .size(14.dp)
+                            .clickable { onSpeakClick(message.text) }
+                    )
+                }
+            }
 
             // Message Bubble Card
             Box(

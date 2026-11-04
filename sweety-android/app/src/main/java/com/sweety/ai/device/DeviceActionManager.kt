@@ -43,48 +43,62 @@ class DeviceActionManager(private val context: Context) {
      * Finds and opens an installed app by name (e.g., 'YouTube', 'WhatsApp', 'Facebook')
      */
     fun openApp(appName: String, packageName: String? = null): Pair<Boolean, String> {
+        val cleanName = appName.trim().lowercase()
+
+        // If user is asking for song/youtube in openApp, redirect directly to playYouTube!
+        if (cleanName.contains("youtube") || cleanName.contains("ইউটিউব") ||
+            cleanName.contains("গান") || cleanName == "yt" || cleanName.contains("song")
+        ) {
+            return playYouTube(appName)
+        }
+
         val pm = context.packageManager
 
-        // 1. If explicit package name provided and installed
-        if (!packageName.isNullOrBlank()) {
-            val intent = pm.getLaunchIntentForPackage(packageName)
+        // Known package mapping for instant, error-free launch
+        val resolvedPackage = packageName ?: when {
+            cleanName.contains("whatsapp") || cleanName.contains("হোয়াটসঅ্যাপ") || cleanName.contains("হোয়াটসঅ্যাপ") -> "com.whatsapp"
+            cleanName.contains("facebook") || cleanName.contains("ফেসবুক") || cleanName == "fb" -> "com.facebook.katana"
+            cleanName.contains("messenger") || cleanName.contains("মেসেঞ্জার") -> "com.facebook.orca"
+            cleanName.contains("chrome") || cleanName.contains("ক্রোম") || cleanName.contains("browser") || cleanName.contains("ব্রাউজার") -> "com.android.chrome"
+            cleanName.contains("camera") || cleanName.contains("ক্যামেরা") -> "com.google.android.GoogleCamera"
+            cleanName.contains("gallery") || cleanName.contains("গ্যালারি") || cleanName.contains("photos") -> "com.google.android.apps.photos"
+            cleanName.contains("settings") || cleanName.contains("সেটিংস") -> "com.android.settings"
+            cleanName.contains("instagram") || cleanName.contains("ইনস্টাগ্রাম") || cleanName == "insta" -> "com.instagram.android"
+            cleanName.contains("telegram") || cleanName.contains("টেলিগ্রাম") -> "org.telegram.messenger"
+            cleanName.contains("calculator") || cleanName.contains("ক্যালকুলেটর") -> "com.google.android.calculator"
+            cleanName.contains("clock") || cleanName.contains("ঘড়ি") || cleanName.contains("ঘড়ি") -> "com.google.android.deskclock"
+            cleanName.contains("spotify") || cleanName.contains("স্পটিফাই") -> "com.spotify.music"
+            else -> null
+        }
+
+        if (!resolvedPackage.isNullOrBlank()) {
+            val intent = pm.getLaunchIntentForPackage(resolvedPackage)
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
-                return Pair(true, "$appName ওপেন করছি।")
+                return Pair(true, "$appName ওপেন করছি!")
             }
         }
 
-        // 2. Search installed packages by app label
+        // Search installed packages by app label
         try {
             val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            val query = appName.trim().lowercase()
-
             for (appInfo in installedApps) {
                 val label = pm.getApplicationLabel(appInfo).toString().lowercase()
-                if (label.contains(query) || query.contains(label)) {
+                if (label.contains(cleanName) || cleanName.contains(label)) {
                     val launchIntent = pm.getLaunchIntentForPackage(appInfo.packageName)
                     if (launchIntent != null) {
                         launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         context.startActivity(launchIntent)
-                        return Pair(true, "${pm.getApplicationLabel(appInfo)} ওপেন করছি।")
+                        return Pair(true, "${pm.getApplicationLabel(appInfo)} ওপেন করছি!")
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "App launch error: ${e.message}")
+            Log.e(TAG, "App launch search error: ${e.message}")
         }
 
-        // Fallback: search in Google Play Store
-        return try {
-            val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=$appName")).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(marketIntent)
-            Pair(true, "$appName ফোনে পাওয়া যায়নি, প্লে-স্টোরে খুঁজছি।")
-        } catch (e: Exception) {
-            Pair(false, "$appName অ্যাপটি ফোনে খুঁজে পাওয়া যায়নি।")
-        }
+        return Pair(false, "$appName অ্যাপটি আপনার ফোনে খুঁজে পাওয়া যায়নি।")
     }
 
     /**
@@ -216,25 +230,42 @@ class DeviceActionManager(private val context: Context) {
      * Searches and plays a song or video directly on YouTube
      */
     fun playYouTube(query: String): Pair<Boolean, String> {
+        val cleanQuery = query.trim().ifBlank { "Bangla songs" }
         return try {
-            val cleanQuery = query.trim()
+            val pm = context.packageManager
+            val ytPackage = "com.google.android.youtube"
+
+            // 1. Try launching YouTube Search Intent directly into YouTube app
+            val searchIntent = Intent(Intent.ACTION_SEARCH).apply {
+                setPackage(ytPackage)
+                putExtra("query", cleanQuery)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            if (searchIntent.resolveActivity(pm) != null) {
+                context.startActivity(searchIntent)
+                return Pair(true, "ইউটিউবে \"$cleanQuery\" বাজাচ্ছি!")
+            }
+
+            // 2. Try URI view intent for YouTube app
             val uri = Uri.parse("https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode(cleanQuery, "UTF-8"))
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                setPackage("com.google.android.youtube")
+            val viewIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage(ytPackage)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             try {
-                context.startActivity(intent)
-                Pair(true, "ইউটিউবে \"$cleanQuery\" প্লে করছি।")
+                context.startActivity(viewIntent)
+                Pair(true, "ইউটিউবে \"$cleanQuery\" প্লে করছি!")
             } catch (e: Exception) {
-                val browserIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                // If setPackage fails (e.g. YouTube Vanced, Revanced, or Browser), launch general view intent without forcing package
+                val generalIntent = Intent(Intent.ACTION_VIEW, uri).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(browserIntent)
-                Pair(true, "ব্রাউজারে ইউটিউবে \"$cleanQuery\" প্লে করছি।")
+                context.startActivity(generalIntent)
+                Pair(true, "ইউটিউবে \"$cleanQuery\" বাজাচ্ছি!")
             }
         } catch (e: Exception) {
-            Pair(false, "ইউটিউব ওপেন করা যায়নি: ${e.localizedMessage}")
+            Pair(false, "ইউটিউব ওপেন করা সম্ভব হয়নি: ${e.localizedMessage}")
         }
     }
 

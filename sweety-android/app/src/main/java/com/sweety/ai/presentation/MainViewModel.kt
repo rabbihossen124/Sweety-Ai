@@ -109,6 +109,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 },
                 onErrorNotice = { notice ->
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        try {
+                            android.widget.Toast.makeText(context, notice, android.widget.Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {}
+                    }
                     if (_state.value == AssistantState.LISTENING) {
                         _state.value = AssistantState.IDLE
                     }
@@ -291,32 +296,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         _messages.value = _messages.value + assistantMsg
 
-        if (fromVoice) {
-            // Speak response via Multilingual TTS
-            _state.value = AssistantState.SPEAKING
-            try {
-                tts?.speak(text) {
-                    // On speech done:
-                    viewModelScope.launch(Dispatchers.Main) {
-                        try {
-                            if (continueListening) {
-                                startContinuousListeningWindow()
-                            } else {
-                                _state.value = AssistantState.IDLE
-                            }
-                        } catch (t: Throwable) {
+        // Always speak Sweety's cute voice so user always hears her!
+        _state.value = AssistantState.SPEAKING
+        try {
+            tts?.speak(text) {
+                // On speech done:
+                viewModelScope.launch(Dispatchers.Main) {
+                    try {
+                        if (fromVoice && continueListening) {
+                            startContinuousListeningWindow()
+                        } else {
                             _state.value = AssistantState.IDLE
                         }
+                    } catch (t: Throwable) {
+                        _state.value = AssistantState.IDLE
                     }
                 }
-            } catch (t: Throwable) {
-                Log.e(TAG, "TTS speak error: ${t.message}")
-                _state.value = AssistantState.IDLE
             }
-        } else {
-            // Text chat mode: answered directly in chat
+        } catch (t: Throwable) {
+            Log.e(TAG, "TTS speak error: ${t.message}")
             _state.value = AssistantState.IDLE
         }
+    }
+
+    fun speakMessage(text: String) {
+        viewModelScope.launch(Dispatchers.Main) {
+            _state.value = AssistantState.SPEAKING
+            tts?.speak(text) {
+                _state.value = AssistantState.IDLE
+            }
+        }
+    }
+
+    fun onFileSelected(uri: android.net.Uri) {
+        val fileName = try {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIdx = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx != -1) it.getString(nameIdx) else null
+                } else null
+            } ?: uri.lastPathSegment ?: "ফাইল"
+        } catch (e: Exception) {
+            uri.lastPathSegment ?: "ফাইল"
+        }
+
+        val prompt = "আমি এই ফাইলটি শেয়ার করেছি: $fileName"
+        processUserPrompt(prompt, fromVoice = false)
     }
 
     /**

@@ -116,7 +116,7 @@ class MultilingualTextToSpeech(
                 player.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
 

@@ -58,5 +58,5 @@ jobs:
           git tag -d latest || true
           git push origin :refs/tags/latest || true
           gh release create latest Sweety-AI.apk Sweety-AI-Debug.apk \
-            --title "Sweety AI Official Release (v1.3.2 - Ultra-Fast & Clean Build)" \
-            --notes "Sweety AI v1.3.2 APK with ultra-fast response, Nothing Phone (3a) support, and full device controls."
+            --title "Sweety AI Official Release (v1.3.3 - Direct YouTube & Real Voice)" \
+            --notes "Sweety AI v1.3.3 APK: Direct YouTube song playing without Play Store, conflict-free voice input/TTS, Android file picker, and witty companion tone."

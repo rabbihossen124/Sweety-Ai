@@ -35,6 +35,11 @@ class ClapDetectorService : Service() {
 
     private var firstClapTimestamp = 0L
 
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -172,8 +177,27 @@ class ClapDetectorService : Service() {
         startActivity(launchIntent)
     }
 
+    fun pauseRecording() {
+        if (!isRecording) return
+        try {
+            isRecording = false
+            audioRecord?.stop()
+            audioRecord?.release()
+            audioRecord = null
+            Log.d(TAG, "ClapDetector microphone released for voice recognizer")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error pausing audio record: ${e.message}")
+        }
+    }
+
+    fun resumeRecording() {
+        if (isRecording) return
+        startClapListening()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        instance = null
         isRecording = false
         try {
             audioRecord?.stop()
@@ -193,6 +217,25 @@ class ClapDetectorService : Service() {
         private const val CLAP_THRESHOLD = 17500.0 // Sound intensity spike
         private const val MIN_CLAP_INTERVAL_MS = 200L // 0.2s minimum between claps
         private const val MAX_CLAP_INTERVAL_MS = 750L // 0.75s maximum window
+
+        @Volatile
+        private var instance: ClapDetectorService? = null
+
+        fun pauseListening() {
+            try {
+                instance?.pauseRecording()
+            } catch (e: Exception) {
+                Log.w(TAG, "ClapDetectorService.pauseListening error: ${e.message}")
+            }
+        }
+
+        fun resumeListening() {
+            try {
+                instance?.resumeRecording()
+            } catch (e: Exception) {
+                Log.w(TAG, "ClapDetectorService.resumeListening error: ${e.message}")
+            }
+        }
     }
 }
 
