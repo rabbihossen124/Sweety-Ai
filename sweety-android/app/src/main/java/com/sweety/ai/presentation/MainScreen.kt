@@ -34,17 +34,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
@@ -196,7 +195,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = ElectricCyan.copy(alpha = 0.2f), thickness = 0.8.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(0.8.dp)
+                            .background(ElectricCyan.copy(alpha = 0.2f))
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Sessions List (Messenger / Facebook style)
@@ -573,7 +577,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 📎 File Attachment / Picker Button (Audio, Video, Files)
+                        // 📎 File Attachment / Share Button (Audio, Video, Files)
                         IconButton(
                             onClick = { viewModel.deviceManager.shareFile() },
                             modifier = Modifier
@@ -583,8 +587,8 @@ fun MainScreen(viewModel: MainViewModel) {
                                 .border(0.8.dp, ElectricCyan.copy(alpha = 0.4f), CircleShape)
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.AttachFile,
-                                contentDescription = "Attach File",
+                                imageVector = Icons.Filled.Share,
+                                contentDescription = "Share File",
                                 tint = ElectricCyan,
                                 modifier = Modifier.size(20.dp)
                             )
