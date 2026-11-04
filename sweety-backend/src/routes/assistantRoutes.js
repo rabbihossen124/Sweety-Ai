@@ -42,59 +42,65 @@ function addWavHeader(pcmBuffer, sampleRate = 24000, numChannels = 1, bitDepth =
 
 /**
  * Smart Dual-Language TTS Voice Endpoint:
- * - English: Generates ultra-expressive human-like conversational voice (Gemini 2.5 TTS 'Kore' / Chat Experiences Journey voice)
- * - Bengali / Hindi: Generates natural sweet neural native voice
+ * - Generates ultra-expressive human-like conversational voice (Gemini TTS 'Kore')
+ * - Strictly locked to Rabbi Sir's provided voice style (sweet female natural voice) across Bengali, Hindi, and English!
  */
 router.get("/tts", async (req, res) => {
   const text = req.query.text;
-  const lang = req.query.lang || "bn";
   if (!text) return res.status(400).send("No text provided");
 
   const cleanText = text.replace(/[*#_`~]/g, "").trim().substring(0, 300);
-  const isEnglish = lang === "en" || !/[\u0980-\u09FF\u0900-\u097F]/.test(cleanText);
 
-  // 1. If English, attempt Gemini's ultra-realistic Conversational Neural Voice (Kore - Chat Experience)
-  if (isEnglish && process.env.GEMINI_API_KEY) {
-    try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      const ttsModelUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-      const payload = {
-        contents: [{ parts: [{ text: cleanText }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: "Kore", // Expressive, sweet, natural female conversational voice
+  // 1. Attempt Gemini Conversational Neural Voice (Kore) across all languages
+  if (process.env.GEMINI_API_KEY) {
+    const ttsModels = [
+      "gemini-2.5-flash-preview-tts",
+      "gemini-3.8-flash-tts",
+      "gemini-3.1-flash-tts-preview",
+    ];
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    for (const model of ttsModels) {
+      try {
+        const ttsModelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: [{ parts: [{ text: cleanText }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: "Kore", // Rabbi Sir's expressive sweet female voice
+                },
               },
             },
           },
-        },
-      };
+        };
 
-      const geminiRes = await fetch(ttsModelUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+        const geminiRes = await fetch(ttsModelUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      if (geminiRes.ok) {
-        const geminiData = await geminiRes.json();
-        const base64Audio = geminiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (base64Audio) {
-          const pcm = Buffer.from(base64Audio, "base64");
-          const wavBuffer = addWavHeader(pcm, 24000, 1, 16);
-          res.setHeader("Content-Type", "audio/wav");
-          res.setHeader("Cache-Control", "public, max-age=86400");
-          return res.send(wavBuffer);
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json();
+          const base64Audio = geminiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            const pcm = Buffer.from(base64Audio, "base64");
+            const wavBuffer = addWavHeader(pcm, 24000, 1, 16);
+            res.setHeader("Content-Type", "audio/wav");
+            res.setHeader("Cache-Control", "public, max-age=86400");
+            return res.send(wavBuffer);
+          }
         }
+      } catch (e) {
+        console.warn(`TTS Model ${model} failed:`, e.message);
       }
-    } catch (e) {
-      console.warn("Gemini preview-tts error, falling back to Google Neural TTS:", e.message);
     }
   }
 
-  // Strict 3-Voice Engine (Locked ONLY to Rabbi Sir's 3 provided voices: Bengali, Hindi, and English Kore)
+  // 2. High-speed fallback if API key or quota issues arise
   try {
     const isBangla = /[\u0980-\u09FF]/.test(cleanText);
     const isHindi = /[\u0900-\u097F]/.test(cleanText);

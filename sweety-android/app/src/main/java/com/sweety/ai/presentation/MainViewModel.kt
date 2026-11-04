@@ -133,13 +133,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.Main) {
             cancelFollowUpTimer()
             tts?.stop()
-            val wakeGreeting = "জি রাব্বি স্যার! সুইটি শুনছি, বলুন কী করতে হবে?"
+            val wakeGreeting = "জি স্যার! শুনছি, বলুন?"
             val assistantMsg = ChatMessage(text = wakeGreeting, isUser = false)
             _messages.value = _messages.value + assistantMsg
 
             _state.value = AssistantState.SPEAKING
             tts?.speak(wakeGreeting) {
                 viewModelScope.launch(Dispatchers.Main) {
+                    kotlinx.coroutines.delay(300)
                     _state.value = AssistantState.LISTENING
                     stt?.startListening()
                 }
@@ -229,10 +230,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val fastMatch = commandDispatcher.tryFastLocalIntent(prompt)
                 if (fastMatch.first && fastMatch.second != null) {
                     val feedback = fastMatch.second!!
+
+                    // Stop listening if user closed app, played music, or locked phone
+                    val isActionExitOrSong = prompt.lowercase().let { p ->
+                        p.contains("close") || p.contains("clos") || p.contains("বন্ধ") ||
+                        p.contains("গান") || p.contains("song") || p.contains("play") ||
+                        p.contains("লক") || p.contains("lock")
+                    }
+
                     handleAssistantReply(
                         text = feedback,
                         actions = emptyList(),
-                        continueListening = fromVoice,
+                        continueListening = if (isActionExitOrSong) false else fromVoice,
                         fromVoice = fromVoice
                     )
                     return@launch
@@ -257,10 +266,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
 
+                    val isActionExitOrSong = prompt.lowercase().let { p ->
+                        p.contains("close") || p.contains("clos") || p.contains("বন্ধ") ||
+                        p.contains("গান") || p.contains("song") || p.contains("play") ||
+                        p.contains("লক") || p.contains("lock")
+                    } || executedActions.any {
+                        it.action == "play_youtube" || it.action == "close_app" || it.action == "lock_device"
+                    }
+
+                    val allowContinue = if (isActionExitOrSong) false else (if (fromVoice) response.continueListening else false)
+
                     handleAssistantReply(
                         text = response.text,
                         actions = executedActions,
-                        continueListening = if (fromVoice) response.continueListening else false,
+                        continueListening = allowContinue,
                         fromVoice = fromVoice
                     )
                 } else {
@@ -351,6 +370,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun startContinuousListeningWindow() {
         viewModelScope.launch(Dispatchers.Main) {
             try {
+                // Short 350ms delay to let audio output hardware settle before opening microphone
+                kotlinx.coroutines.delay(350)
                 _state.value = AssistantState.LISTENING
                 stt?.startListening()
 

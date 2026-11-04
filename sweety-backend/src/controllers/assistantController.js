@@ -103,13 +103,19 @@ export const handleChat = async (req, res) => {
       inMemoryConversations.set(sessionId, current.slice(-20));
     }
 
-    // Return response with continueListening: true so Android knows to keep listening
+    // Decide continueListening: STOP listening if user played music, closed app, or locked device
+    const hasExitOrMusicAction = (geminiResult.actions || []).some(
+      (a) => a.action === "play_youtube" || a.action === "close_app" || a.action === "lock_device"
+    );
+    const isExitOrMusicPrompt = /(গান|song|play|youtube|ক্লোজ|close|বন্ধ|লক|lock|থামো|stop|হোমে)/i.test(trimmedMessage);
+    const continueListening = !(hasExitOrMusicAction || isExitOrMusicPrompt);
+
     return res.json({
       success: true,
       text: geminiResult.text,
       actions: geminiResult.actions,
       sessionId,
-      continueListening: true, // Keep the listening window active for chained instructions
+      continueListening,
     });
   } catch (error) {
     console.error("Assistant Controller Error:", error);

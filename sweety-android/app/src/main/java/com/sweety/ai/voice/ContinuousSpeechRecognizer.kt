@@ -169,6 +169,11 @@ class ContinuousSpeechRecognizer(
 
         mainHandler.post {
             try {
+                // Ensure any previous session is cancelled cleanly
+                try {
+                    speechRecognizer?.cancel()
+                } catch (t: Throwable) {}
+
                 if (!ensureRecognizerReady()) {
                     onErrorNotice("মাইক্রোফোন চালু করা যায়নি!")
                     isListening = false
@@ -183,16 +188,12 @@ class ContinuousSpeechRecognizer(
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
 
-                    // Snappy, fast listening: responds quickly (~1.2-1.5s silence) after Rabbi Sir stops speaking
-                    putExtra("android.speech.extras.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS", 1500L)
-                    putExtra("android.speech.extras.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS", 1000L)
-                    putExtra("android.speech.extras.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS", 1500L)
+                    // Patient, accurate listening window: gives enough time for Rabbi Sir to speak naturally
+                    putExtra("android.speech.extras.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS", 2500L)
+                    putExtra("android.speech.extras.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS", 1800L)
+                    putExtra("android.speech.extras.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS", 2000L)
 
                     when (selectedLanguage) {
-                        "bn" -> {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                        }
                         "hi" -> {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
@@ -204,11 +205,6 @@ class ContinuousSpeechRecognizer(
                         else -> {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                            // Correct Type: MUST be ArrayList<String> for RecognizerIntent Bundle
-                            putExtra(
-                                "android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES",
-                                arrayListOf("en-US", "hi-IN", "bn-IN")
-                            )
                         }
                     }
                 }

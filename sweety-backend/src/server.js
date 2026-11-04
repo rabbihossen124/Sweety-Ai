@@ -118,16 +118,16 @@ app.get("/", (req, res) => {
     <body>
       <div class="card">
         <h1>✨ Sweety AI Official</h1>
-        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.3.3 - Direct YouTube & Real Voice)</p>
+        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.3.4 - Auto-Stop on Music & Pure Kore Voice)</p>
         
-        <a class="btn-primary" href="/download">📲 ১ ক্লিকে সরাসরি APK v1.3.3 ডাউনলোড</a>
+        <a class="btn-primary" href="/download">📲 ১ ক্লিকে সরাসরি APK v1.3.4 ডাউনলোড</a>
         <a class="btn-secondary" href="https://github.com/rabbihossen124/Sweety-Ai/releases/tag/latest">⭐ GitHub রিলিজ পেজ</a>
 
         <div class="tip">
           💡 <b>ইনস্টল গাইড:</b> কোনো ZIP ফাইল ডাউনলোড হবে না! সরাসরি <b>Sweety-AI.apk</b> ফাইল ডাউনলোড হবে। ডাউনলোড শেষে নোটিফিকেশন বা ফাইল ম্যানেজারে APK ওপেন করে "Install" চাপলেই আপনার ফোনে ইনস্টল হয়ে যাবে।
         </div>
         
-        <div class="badge">🚀 Backend Status: Active & Connected (v1.3.3)</div>
+        <div class="badge">🚀 Backend Status: Active & Connected (v1.3.4)</div>
       </div>
     </body>
     </html>

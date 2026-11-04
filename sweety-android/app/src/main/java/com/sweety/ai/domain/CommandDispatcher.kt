@@ -14,48 +14,53 @@ class CommandDispatcher(
      * Returns Pair(handled: Boolean, replyText: String?)
      */
     fun tryFastLocalIntent(prompt: String): Pair<Boolean, String?> {
-        val clean = prompt.trim().lowercase()
+        var clean = prompt.trim().lowercase()
 
-        // 0. Wake Word & Friendly Greeting
-        if (clean == "hey sweety" || clean == "hi sweety" || clean == "sweety" ||
-            clean == "hey sweetie" || clean == "hi sweetie" || clean == "sweetie" ||
-            clean == "হাই সুইটি" || clean == "হ্যালো সুইটি" || clean == "হেই সুইটি" ||
-            clean == "সুইটি" || clean == "এই সুইটি" || clean == "সুইটি শোনো" || clean == "সুইটি আছো" ||
-            clean.startsWith("hey sweety") || clean.startsWith("hi sweety") ||
-            clean.startsWith("hey sweetie") || clean.startsWith("hi sweetie") ||
-            clean.startsWith("হাই সুইটি") || clean.startsWith("হেই সুইটি") ||
-            clean.startsWith("হ্যালো সুইটি") || clean.startsWith("সুইটি ")
-        ) {
-            val greeting = "জি রাব্বি স্যার! বলুন আমি শুনছি, আপনার জন্য কী কাজ করতে হবে?"
-            return Pair(true, greeting)
+        // 0. Strip wake word prefix if user said "Sweety, play a song" or similar
+        val wakePrefixes = listOf(
+            "hey sweety", "hi sweety", "sweety", "sweetie",
+            "হাই সুইটি", "হ্যালো সুইটি", "হেই সুইটি", "সুইটি ", "এই সুইটি ", "সুইটি শোনো", "সুইটি আছো"
+        )
+        for (prefix in wakePrefixes) {
+            if (clean == prefix || clean == prefix.trim()) {
+                // Standalone wake word called! Fast & friendly greeting
+                return Pair(true, "জি স্যার! শুনছি, বলুন?")
+            }
+            if (clean.startsWith(prefix)) {
+                clean = clean.removePrefix(prefix).trim().removePrefix(",").trim()
+            }
+        }
+
+        // If after stripping only wake word existed
+        if (clean.isBlank() || clean == "সুইটি" || clean == "sweetie") {
+            return Pair(true, "জি স্যার! শুনছি, বলুন?")
         }
 
         // 1. Flashlight on/off
         if (clean.contains("flashlight on") || clean.contains("flash on") ||
             clean.contains("ফ্ল্যাশলাইট অন") || clean.contains("আলো জ্বালাও") ||
-            clean.contains("टॉर्च ऑन") || clean.contains("flashlight chalu")
+            clean.contains("টর্চ অন") || clean.contains("flashlight chalu")
         ) {
             val res = deviceManager.toggleFlashlight(true)
             return Pair(true, res.second)
         }
         if (clean.contains("flashlight off") || clean.contains("flash off") ||
             clean.contains("ফ্ল্যাশলাইট অফ") || clean.contains("আলো নিভিয়ে") ||
-            clean.contains("টর্চ বন্ধ") || clean.contains("टॉर्च बंद")
+            clean.contains("টর্চ বন্ধ") || clean.contains("টর্চ অফ")
         ) {
             val res = deviceManager.toggleFlashlight(false)
             return Pair(true, res.second)
         }
 
         // 2. Battery status
-        if (clean.contains("battery") || clean.contains("ব্যাটারি") || clean.contains("চার্জ কত") || clean.contains("बैटरी")) {
+        if (clean.contains("battery") || clean.contains("ব্যাটারি") || clean.contains("চার্জ কত")) {
             val info = deviceManager.getBatteryInfo()
             return Pair(true, info)
         }
 
         // 3. Screen lock
         if (clean.contains("lock phone") || clean.contains("lock screen") ||
-            clean.contains("ফোন লক করো") || clean.contains("ফোনটা লক করো") ||
-            clean.contains("स्क्रीन लॉक करो")
+            clean.contains("ফোন লক") || clean.contains("লক করো") || clean.contains("স্ক্রিন লক")
         ) {
             val res = deviceManager.lockDevice()
             return Pair(true, res.second)
@@ -87,25 +92,38 @@ class CommandDispatcher(
             return Pair(true, res.second)
         }
 
-        // 7. Close App / Go Home
-        if (clean.contains("close app") || clean.contains("অ্যাপ বন্ধ") || clean.contains("অ্যাপ ক্লোজ") || clean.contains("হোমে যাও") || clean.contains("go home")) {
+        // 7. Close Chat / Close App / Go Home
+        if (clean.contains("close") || clean.contains("clos") || clean.contains("বন্ধ") ||
+            clean.contains("ক্লোজ") || clean.contains("হোমে যাও") || clean.contains("go home") ||
+            clean.contains("exit") || clean.contains("বাহির")
+        ) {
             val res = deviceManager.closeCurrentApp()
             return Pair(true, res.second)
         }
 
-        // 8. YouTube Quick Song/Music search
-        if (clean.startsWith("play ") || clean.contains("গান চালাও") || clean.contains("গান বাজাও") || clean.contains("ইউটিউবে")) {
+        // 8. YouTube Quick Song/Music search (Plays directly into YouTube app, no Play Store!)
+        if (clean.contains("play") || clean.contains("গান") || clean.contains("song") ||
+            clean.contains("music") || clean.contains("মিউজিক") || clean.contains("ইউটিউব") || clean.contains("youtube")
+        ) {
             var songQuery = clean
                 .replace("play", "")
                 .replace("on youtube", "")
                 .replace("in youtube", "")
+                .replace("youtube", "")
                 .replace("ইউটিউবে", "")
+                .replace("ইউটিউব", "")
                 .replace("গান চালাও", "")
                 .replace("গান বাজাও", "")
+                .replace("গান শোনাও", "")
                 .replace("চালিয়ে দাও", "")
+                .replace("বাজিয়ে দাও", "")
+                .replace("চালিয়ে দাও", "")
+                .replace("শোনাও", "")
                 .replace("গান", "")
+                .replace("song", "")
+                .replace("music", "")
                 .trim()
-            if (songQuery.isBlank()) songQuery = "Bangla new songs"
+            if (songQuery.isBlank()) songQuery = "Bangla new hit songs"
             val res = deviceManager.playYouTube(songQuery)
             return Pair(true, res.second)
         }
