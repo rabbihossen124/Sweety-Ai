@@ -261,7 +261,7 @@ class DeviceActionManager(private val context: Context) {
         val status = if (state) "অন" else "অফ"
         return try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val panelIntent = Intent(android.provider.Settings.Panel.ACTION_WIFI).apply {
+                val panelIntent = Intent("android.settings.panel.action.WIFI").apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(panelIntent)
@@ -316,7 +316,7 @@ class DeviceActionManager(private val context: Context) {
     fun openMobileDataSettings(): Pair<Boolean, String> {
         return try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val intent = Intent(android.provider.Settings.Panel.ACTION_INTERNET).apply {
+                val intent = Intent("android.settings.panel.action.INTERNET_CONNECTIVITY").apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
