@@ -25,9 +25,9 @@ app.get("/api/health", (req, res) => {
 // Assistant endpoints
 app.use("/api/assistant", assistantRoutes);
 
-// Download redirect routes
+// Download redirect routes (Direct APK download - No ZIP)
 app.get("/download", (req, res) => {
-  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI-Debug.apk");
+  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI.apk");
 });
 
 app.get("/release", (req, res) => {
@@ -35,7 +35,11 @@ app.get("/release", (req, res) => {
 });
 
 app.get("/app", (req, res) => {
-  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI-Debug.apk");
+  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI.apk");
+});
+
+app.get("/Sweety-AI.apk", (req, res) => {
+  res.redirect("https://github.com/rabbihossen124/Sweety-Ai/releases/download/latest/Sweety-AI.apk");
 });
 
 // Root route
@@ -114,16 +118,16 @@ app.get("/", (req, res) => {
     <body>
       <div class="card">
         <h1>✨ Sweety AI Official</h1>
-        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.1.0 - Live Avatar Video & Patient Mic)</p>
+        <p>রাব্বি স্যারের পার্সোনাল ভয়েস অ্যাসিস্ট্যান্ট (v1.3.2 - Ultra-Fast & Snappy)</p>
         
-        <a class="btn-primary" href="/download">📲 ১ ক্লিকে ইনস্টল (সরাসরি APK v1.1.0)</a>
-        <a class="btn-secondary" href="/release">⭐ অফিসিয়াল রিলিজ APK</a>
+        <a class="btn-primary" href="/download">📲 ১ ক্লিকে সরাসরি APK v1.3.2 ডাউনলোড</a>
+        <a class="btn-secondary" href="https://github.com/rabbihossen124/Sweety-Ai/releases/tag/latest">⭐ GitHub রিলিজ পেজ</a>
 
         <div class="tip">
-          💡 <b>ইনস্টল গাইড:</b> ডাউনলোড শেষে নোটিফিকেশন বা ফাইল ম্যানেজারে APK ওপেন করে "Install" বা "Install anyway" চাপলেই ইনস্টল সম্পন্ন হবে।
+          💡 <b>ইনস্টল গাইড:</b> কোনো ZIP ফাইল ডাউনলোড হবে না! সরাসরি <b>Sweety-AI.apk</b> ফাইল ডাউনলোড হবে। ডাউনলোড শেষে নোটিফিকেশন বা ফাইল ম্যানেজারে APK ওপেন করে "Install" চাপলেই আপনার ফোনে ইনস্টল হয়ে যাবে।
         </div>
         
-        <div class="badge">🚀 Backend Status: Active & Connected</div>
+        <div class="badge">🚀 Backend Status: Active & Connected (v1.3.2)</div>
       </div>
     </body>
     </html>
